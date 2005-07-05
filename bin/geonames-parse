@@ -7,7 +7,7 @@
 # Email: chris@ex-parrot.com; WWW: http://www.ex-parrot.com/~chris/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.1 2005-06-23 10:38:37 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.2 2005-07-05 17:01:21 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -16,54 +16,24 @@ use IO::File;
 use POSIX qw(acos);
 use Text::CSV;
 
+# Grab the list of "ADM1" administrative regions.
+open(ADM1, "/tmp/geonames/_fips_adm1_code_def_2.txt");
+binmode(ADM1, ":bin");
+<ADM1>; # header
+
+my %ADM1_name;
+
+while (my $line = <ADM1>) {
+    chomp($line);
+    my ($cc, $adm1, $name) = split(/\t/, $line);
+    $ADM1_name{$cc}->{$adm1} = $name;
+}
+
+close(ADM1);
+
 binmode(STDOUT, ":utf8");
 
-# Make up conversion tables
-my $c = new Text::CSV();
-my $f = new IO::File("/web/SERVERS/pb.fishsoupisgoodforyou.com/mysociety/pb/misc/geonames-charsets.csv")
-    or die $!;
-$f->getline();
-$f->getline();
-$f->getline();
-my @chartable = ( );
-while (defined(my $line = $f->getline())) {
-    chomp($line);
-    $c->parse($line) or die "'$line': bad CSV data";
-    my ($byteval, @cc) = $c->fields();
-    my $region = 1;
-    foreach (@cc) {
-        if ($_ eq '') {
-            $chartable[$region]->[$byteval] = sprintf('%c', $byteval);
-        } else {
-            if ($_ eq '0') {
-                die "ERROR! corrupted input: \"$_\" must not be zero";
-            } elsif ($_ =~ /^\d{3}$/) {
-                warn "WARNING! corrupted input: \"$_\" should be four hex digits; assuming \"0$_\"";
-                $_ = "0$_";
-            } elsif ($_ =~ /^([1-9]\d*)e\+(\d+)$/) {
-                warn "WARNING! corrupted input: \"$_\" should be four hex digits; assuming \"$1$2\"";
-                $_ = "$1$2";
-                $_ = "0$_" while (length($_) < 4);
-            }
-        
-            if ($_ eq 'x') {
-                $chartable[$region]->[$byteval] = undef;
-            } elsif (!/^([0-9a-f]{4}(?:|\+([0-9a-f]{4}))(?: |$))/i) {
-                die "don't understand character spec \"$_\" for region $region, byteval $byteval";
-            } else {
-                $chartable[$region]->[$byteval] = join('', map { sprintf('%c', eval "0x$_") } split(/[ +]/, $_));
-            }
-        }
-        ++$region;
-    }
-}
-
-sub convert_to_utf8 ($$) {
-    my ($region, $str) = @_;
-    die "unknown region $region" unless ($region >= 1 && $region <= 6);
-    my $out = join('', map { my $x = $chartable[$region]->[ord($_)]; die sprintf('bad byte \\x%02x for name "%s" in region %d', ord($_), $str, $region) if (!defined($x)); $x } split(//, $str));
-}
-
+# Defined in http://earth-info.nga.mil/gns/html/gis.html
 my @fieldnames = qw(
         RC UFI UNI LAT LONG DMS_LAT DMS_LONG UTM JOG FC DSG PC CC1 ADM1 ADM2
         DIM CC2 NT LC SHORT_FORM GENERIC SORT_NAME FULL_NAME FULL_NAME_ND
@@ -78,75 +48,96 @@ my %seen_UFI;
 my %UFI_by_name;
 my %ambiguous_names;
 
-my %ADM1_name;
-my %ADM1_UFI;
+sub trim ($) {
+    my $x = shift;
+    $x =~ s/^\s+//;
+    $x =~ s/\s+$//;
+    return $x;
+}
 
-<STDIN>;
+my %name_type_exists;
+my %name_types;
+
+# Smaller numbers mean higher preference. These values are used: (a) to select
+# the effective type of a name which is stated under more than one type; (b) to
+# select the preferred "primary" name where names of several types are
+# available.
+my %name_type_preference = (
+        C => 0,         # Conventional
+        N => 1,         # Native
+        V => 2,         # Variant or alternate
+        D => 10         # Not verified
+    );
+
+# Hash which maps UFI to reference to hash of name to name-type.
+my %UFI_name;
+
+<STDIN>;    # Skip header
+
+# Each record describes a name and a feature. Each feature may have multiple
+# names.
 while (my $line = <STDIN>) {
     chomp($line);
     my @fields = split(/\t/, $line);
+    my %fields = map { $_ => trim(shift(@fields)) } @fieldnames;
 
-    my %fields = map { $_ => shift(@fields) } @fieldnames;
+    # The only records we grab are those which describe populated places.
+    next if ($fields{FC} ne 'P');
 
-    $fields{DSG} =~ s/\s*$//;
-
-    if ($fields{DSG} eq 'ADM1') {
-        warn "ADM1 $fields{ADM1} already has name '$ADM1_name{$fields{ADM1}}' but is also mentioned with name '$fields{FULL_NAME}'\n"
-            if (exists($ADM1_name{$fields{ADM1}}));
-        die "ADM1 $fields{ADM1} already exists, with UFI $ADM1_UFI{$fields{ADM1}}"
-            if (exists($ADM1_UFI{$fields{ADM1}}) && $fields{UFI} ne $ADM1_UFI{$fields{ADM1}});
-        $ADM1_name{$fields{ADM1}} = $fields{FULL_NAME};
-        $ADM1_UFI{$fields{ADM1}} = $fields{UFI};
-    }
-
-    # Only grab administrative regions, populated places, and "places"
-#    next if ($fields{FC} !~ /^[APL]$/);
-    next unless ($fields{FC} eq 'P');
-
-    $data_by_UFI{$fields{UFI}} = \%fields;
-
-    foreach (qw(SHORT_FORM GENERIC FULL_NAME )) { #SORT_NAME FULL_NAME_ND)) {
-#        $fields{$_} = convert_to_utf8($fields{RC}, $fields{$_});
+    # Check that the various names are valid UTF-8. Experiments suggest that
+    # SORT_NAME and FULL_NAME_ND won't be (though I'm not sure how they are
+    # actually coded), but happily we don't need those.
+    foreach (qw(SHORT_FORM GENERIC FULL_NAME)) {
         if (!utf8::decode($fields{$_})) {
-            warn "$_ name \"$fields{$_}\" for UFI $fields{UFI} UNI $fields{UNI} is not valid UTF-8";
-            $fields{$_} = convert_to_utf8($fields{RC}, $fields{$_});
-            warn "after conversion from bonkers charset: \"$fields{$_}\"";
+            die "$_ name \"$fields{$_}\" for UFI $fields{UFI} UNI $fields{UNI} is not valid UTF-8";
         }
     }
 
-#    if ($fields{CC1} eq 'UK' && $fields{DSG} =~ /^ADM/) {
-#        print "$fields{DSG} $fields{ADM1} $fields{ADM2} $fields{FULL_NAME}\n";
-#    }
-#    next;
+    my $ufi = $fields{UFI};
+    $UFI_name{$ufi} ||= { };
+    my $name_type = $fields{NT};
+    my $name = $fields{FULL_NAME};
 
+    $data_by_UFI{$fields{UFI}} = \%fields;
 
-    push(@{$names_by_UFI{$fields{UFI}}}, $fields{FULL_NAME});
-#    print "$fields{UFI} names = ", join(", ", @{$names_by_UFI{$fields{UFI}}}), "\n"
-#        if (@{$names_by_UFI{$fields{UFI}}} > 1);
+    if (exists($UFI_name{$ufi}->{$name})) {
+        warn "#$ufi already has name '$name', type $UFI_name{$ufi}->{$name}\n";
+        $UFI_name{$ufi}->{$name} = $name_type
+            if ($name_type_preference{$name_type} < $name_type_preference{$UFI_name{$ufi}->{$name}});
+    } else {
+        $UFI_name{$ufi}->{$name} = $name_type;
+    }
+
+    $name_type_exists{$name_type} ||= 1;
+    ++$name_types{$name_type}->{$fields{NT}};
 
     if (exists($seen_UFI{$fields{UFI}})) {
-#        warn "already seen UFI $fields{UFI}\n";
         next;
     }
     $seen_UFI{$fields{UFI}} = 1;
 
-    if (exists($UFI_by_name{$fields{FULL_NAME}}) && @{$UFI_by_name{$fields{FULL_NAME}}} && grep { $fields{UFI} != $_ } @{$UFI_by_name{$fields{FULL_NAME}}}) {
-#        my $other = $UFI_by_name{$fields{FULL_NAME}};
-#        warn "$fields{FULL_NAME} ($fields{FC}) ($fields{UFI}) is a duplicate name (previous UFIs: " . join(", ", @{$UFI_by_name{$fields{FULL_NAME}}}) . ")\n";
-        $ambiguous_names{$fields{FULL_NAME}} = 1;
-#        if ($fields{LONG} ne $data_by_UFI{$other}->{LONG} || $fields{LAT} ne $data_by_UFI{$other}->{LAT}) {
-#            die "lat/lon = $fields{LAT}/$fields{LONG} != other lat/lon = $data_by_UFI{$other}->{LAT}/$data_by_UFI{$other}->{LONG}\n";
-#        } else {
-#            warn "same place as $other; skipping\n";
-#        }
+    if (exists($UFI_by_name{$name}) && @{$UFI_by_name{$name}} && grep { $ufi != $_ } @{$UFI_by_name{$name}}) {
+        $ambiguous_names{$name} = 1;
+#        warn "ambiguous: $name\n";
     }
-    push(@{$UFI_by_name{$fields{FULL_NAME}}}, $fields{UFI});
+    push(@{$UFI_by_name{$name}}, $ufi);
+}
 
-    # ADM1 codes from this ftp site:
-    #   ftp://ftp.nga.mil/pub/gns_data/
-#    print "CC1=$fields{CC1}, ADM1=$fields{ADM1}, ADM2=$fields{ADM2}\n";
+my %UFI_by_primary_name;
+my %primary_name_by_UFI;
+my %ambiguous_primary_names;
 
-#    print "UFI=$fields{UFI}\n   UNI=$fields{UNI}\n    FULL_NAME=$fields{FULL_NAME}\n\n";
+# Identify the primary name for each place.
+foreach my $ufi (keys(%UFI_name)) {
+    my $nn = $UFI_name{$ufi};
+    my @names = sort { $name_type_preference{$nn->{$a}} <=> $name_type_preference{$nn->{$b}} } keys(%$nn);
+    my $primary_name = $names[0];
+
+    $primary_name_by_UFI{$ufi} = $primary_name;
+    push(@{$UFI_by_primary_name{lc($primary_name)}}, $ufi);
+    if (@{$UFI_by_primary_name{lc($primary_name)}} > 1) {
+        $ambiguous_primary_names{lc($primary_name)} ||= 1;
+    }
 }
 
 my @UFIs_in_lat_order = sort { $data_by_UFI{$a}->{LAT} <=> $data_by_UFI{$b}->{LAT} } keys(%data_by_UFI);
@@ -209,21 +200,19 @@ sub find_places_near ($$$) {
 }
 
 # Decide on qualifiers for ambiguous names.
-foreach my $full_name (sort keys %ambiguous_names) {
-    print "$full_name:\n";
-    
+foreach my $primary_name (sort keys %ambiguous_primary_names) {
+    print "$primary_name:\n";
     
     my %adm1s;
-    map { ++$adm1s{$data_by_UFI{$_}->{ADM1}} } @{$UFI_by_name{$full_name}};
-    foreach my $ufi (@{$UFI_by_name{$full_name}}) {
+    map { ++$adm1s{$data_by_UFI{$_}->{ADM1}} } @{$UFI_by_primary_name{$primary_name}};
+    foreach my $ufi (@{$UFI_by_primary_name{$primary_name}}) {
         my $place = $data_by_UFI{$ufi};
         print "    $ufi PC=$place->{PC} $place->{DIM} $place->{FC} ($place->{LAT}, $place->{LONG})\n";
         print "      - ADM1 = $place->{ADM1}; ADM2 = $place->{ADM2}\n";
 
-
         print "      - distance to other places of same name:";
         my $mindist = 1e6;
-        foreach my $ufi2 (@{$UFI_by_name{$full_name}}) {
+        foreach my $ufi2 (@{$UFI_by_primary_name{$primary_name}}) {
             next if ($ufi == $ufi2);
             my $d = distance($data_by_UFI{$ufi}->{LAT}, $data_by_UFI{$ufi}->{LONG}, $data_by_UFI{$ufi2}->{LAT}, $data_by_UFI{$ufi2}->{LONG});
             print " ${d}km";
@@ -231,29 +220,28 @@ foreach my $full_name (sort keys %ambiguous_names) {
         }
         print "\n";
 
-        # ADM1 code of '00' means "general", so not useful for identifying places.
-        if ($place->{ADM1} ne '00') {
+        # ADM1 code of '00' means "general", so not useful for identifying
+        # places. Therfore, we don't try to disambiguate place names if any of
+        # the variants has a '00' ADM1.
+        if (!exists($adm1s{'00'})) {
             if ($adm1s{$place->{ADM1}} == 1) {
-                print "      - describe as 'in $ADM1_name{$place->{ADM1}}'\n";
+                print "      - describe as 'in $ADM1_name{$place->{CC1}}->{$place->{ADM1}}'\n";
                 next
             } else {
-                print "      - shares $ADM1_name{$place->{ADM1}} with ", $adm1s{$place->{ADM1}} - 1, " other places of the same name\n";
+                print "      - shares $ADM1_name{$place->{CC1}}->{$place->{ADM1}} with ", $adm1s{$place->{ADM1}} - 1, " other places of the same name\n";
             }
         }
 
         $mindist = 10 if ($mindist < 10);
-        my $N = 0;
         my @nearby = sort { $a->[1] <=> $b->[1] }
                         grep {
                             # Mustn't identify a place as being near another
                             # ambiguously named place...
-                            !exists($ambiguous_names{$data_by_UFI{$_->[0]}->{FULL_NAME}})
+                            !exists($ambiguous_primary_names{lc($primary_name_by_UFI{$_->[0]})})
                             # or as near itself.
                             && $_->[0] ne $ufi
-                            # only print ten
-                            && $N++ < 10
                         } find_places_near($place->{LAT}, $place->{LONG}, $mindist / 2);
-        print "      - nearby: ", join(", ", map { "$_->[0] PC=$data_by_UFI{$_->[0]}->{PC} $data_by_UFI{$_->[0]}->{DIM} $data_by_UFI{$_->[0]}->{FULL_NAME} ($_->[1]km)" } @nearby), "\n\n";
+        print "      - nearby: ", join(", ", map { "$_->[0] PC=$data_by_UFI{$_->[0]}->{PC} $data_by_UFI{$_->[0]}->{DIM} $primary_name_by_UFI{$_->[0]} ($_->[1]km)" } @nearby[0 .. 9]), "\n\n";
 
         # 
         
