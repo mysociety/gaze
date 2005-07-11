@@ -3,11 +3,11 @@
 # geonames-parse:
 # Parse GEOnet Names Server data from http://earth-info.nga.mil/gns/html/
 #
-# Copyright (c) 2005 Chris Lightfoot. All rights reserved.
-# Email: chris@ex-parrot.com; WWW: http://www.ex-parrot.com/~chris/
+# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
+# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.4 2005-07-11 09:19:30 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.5 2005-07-11 16:05:09 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -226,35 +226,29 @@ sub find_places_near ($$$) {
 
 # Decide on qualifiers for ambiguous names.
 foreach my $primary_name (sort keys %ambiguous_primary_names) {
-    print "$primary_name:\n";
-    
     my %adm1s;
     map { ++$adm1s{$data_by_UFI{$_}->{ADM1}} } @{$UFI_by_primary_name{$primary_name}};
     foreach my $ufi (@{$UFI_by_primary_name{$primary_name}}) {
         my $place = $data_by_UFI{$ufi};
-        print "    $ufi PC=$place->{PC} $place->{DIM} $place->{FC} ($place->{LAT}, $place->{LONG})\n";
-        print "      - ADM1 = $place->{ADM1}; ADM2 = $place->{ADM2}\n";
 
-        print "      - distance to other places of same name:";
+        # Find distance to places of the same name
         my $mindist = 1e6;
         foreach my $ufi2 (@{$UFI_by_primary_name{$primary_name}}) {
             next if ($ufi == $ufi2);
             my $d = distance($data_by_UFI{$ufi}->{LAT}, $data_by_UFI{$ufi}->{LONG}, $data_by_UFI{$ufi2}->{LAT}, $data_by_UFI{$ufi2}->{LONG});
-            print " ${d}km";
             $mindist = $d if ($d < $mindist);
         }
         print "\n";
 
         # ADM1 code of '00' means "general", so not useful for identifying
-        # places. Therfore, we don't try to disambiguate place names if any of
-        # the variants has a '00' ADM1.
-        if (!exists($adm1s{'00'})) {
-            if ($adm1s{$place->{ADM1}} == 1) {
-                print "      - describe as 'in $ADM1_name{$place->{CC1}}->{$place->{ADM1}}'\n";
-                next
-            } else {
-                print "      - shares $ADM1_name{$place->{CC1}}->{$place->{ADM1}} with ", $adm1s{$place->{ADM1}} - 1, " other places of the same name\n";
-            }
+        # places. Therfore, we don't try to disambiguate place names by
+        # enclosing administrative region if any of the variants has a '00'
+        # ADM1.
+        if (!exists($adm1s{'00'}) && $adm1s{$place->{ADM1}} == 1) {
+            # None of the places has a 00 ADM1, and this is the only such place
+            # which is in this administrative division.
+            dbh()->do("update feature set qualifier_type = 'in', qualifier = ? where ufi = ?", {}, $ADM1_name{$place->{CC1}}->{$place->{ADM1}}, $ufi);
+            next;
         }
 
         $mindist = 10 if ($mindist < 10);
@@ -270,9 +264,8 @@ foreach my $primary_name (sort keys %ambiguous_primary_names) {
         my $n = $#nearby;
         $n = 2 if ($n > 2);
         @nearby = @nearby[0 .. $n];
-        print "      - nearby: ", join(", ", map { "$_->[0] $primary_name_by_UFI{$_->[0]} ($_->[1]km)" } @nearby), "\n\n";
 
-#        print GP "set label '$full_name ($place->{FC})' at $place->{LONG}, $place->{LAT} point pt 1\n";
+        dbh()->do("update feature set qualifier_type = 'near', qualifier = ? where ufi = ?", {}, join(", ", map { $_->[0] } @nearby), $ufi);
     }
 }
 
