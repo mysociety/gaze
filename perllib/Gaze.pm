@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.1 2005-07-08 16:13:14 chris Exp $
+# $Id: Gaze.pm,v 1.2 2005-07-12 17:35:27 chris Exp $
 #
 
 package Gaze;
@@ -34,7 +34,7 @@ sub split_name_parts ($) {
     #   of Of oF
     #
     my %parts;
-    my @words = split(/[^[:alpha]]+/, $name);
+    my @words = split(/[^[:alpha:]]+/, $name);
     foreach (@words) {
         if (length($_) <= name_part_size) {
             ++$parts{$_};
@@ -45,7 +45,7 @@ sub split_name_parts ($) {
         } else {
             ++$parts{substr($_, 0, name_part_size)};
             ++$parts{uc(substr($_, 0, 1)) . substr($_, 1, name_part_size - 1)};
-            for (my $i = 1; $i < length($_) - name_part_size - 1; ++$i) {
+            for (my $i = 1; $i < length($_) - name_part_size; ++$i) {
                 ++$parts{substr($_, $i, name_part_size)};
             }
             ++$parts{substr($_, - name_part_size)};
