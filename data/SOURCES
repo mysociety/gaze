@@ -1,0 +1,7 @@
+_fips_adm1_code_def_2.txt
+From NGA at <ftp://ftp.nga.mil/pub/gns_data/>, converted for UNIX newlines.
+
+fips-10-4-to-iso-country-codes.csv
+From <http://www.cia.gov/cia/publications/factbook/appendix/appendix-d.html>,
+inferring ISO codes where none are specified according to the notes in that
+table.
