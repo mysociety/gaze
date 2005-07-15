@@ -1,0 +1,63 @@
+#!/usr/bin/perl -w -I../perllib -I../../../perllib
+#
+# search:
+#
+# Copyright (c) 2005 FR Citizens Online Democracy. All rights reserved.
+# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
+#
+
+my $rcsid = ''; $rcsid .= '$Id: search,v 1.1 2005-07-15 12:12:27 chris Exp $';
+
+use strict;
+require 5.8.0;
+
+use mySociety::DBHandle qw(dbh);
+
+use Gaze;
+
+mySociety::DBHandle::configure(Name => 'gaze', User => 'gaze');
+
+my $query = join(' ', @ARGV);
+print "query = [$query]\n";
+
+my $terms = Gaze::split_name_parts($query);
+print "terms: ", join(", ", map { "$terms->{$_} '$_'" } sort keys %$terms), "\n";
+
+my %possibles;
+my %count;
+my $s = dbh()->prepare("
+            select name.uni, name.ufi
+            from name_part, name, feature
+            where name.uni = name_part.uni
+                and feature.ufi = name.ufi
+                and feature.country = 'FR'
+                and namepart = ?");
+foreach my $t (keys %$terms) {
+    $s->execute($t);
+    $count{$t} ||= dbh()->selectrow_array("select count(name_part.uni) from name_part, name, feature where namepart = ? and name_part.uni = name.uni and name.ufi = feature.ufi and feature.country = 'FR'", {}, $t);
+    while (my ($uni, $ufi) = $s->fetchrow_array()) {
+        $possibles{$ufi}->{$uni} += 1 / $count{$t}; # rather noddy relevance scoring
+    }
+}
+
+foreach my $ufi (keys %possibles) {
+    my ($bestuni, $maxscore);
+    foreach my $uni (keys %{$possibles{$ufi}}) {
+        if (!defined($bestuni) || $possibles{$ufi}->{$uni} > $maxscore) {
+            $bestuni = $uni;
+            $maxscore = $possibles{$ufi}->{$uni};
+        }
+    }
+    $possibles{$ufi} = [$maxscore, $bestuni];
+}
+
+my @ufis = sort { $possibles{$b}->[0] <=> $possibles{$a}->[0] } keys %possibles;
+my $n = 0;
+foreach (@ufis) {
+    my $name = dbh()->selectrow_array('select full_name from name where is_primary and ufi = ?', {}, $_);
+    my ($qt, $q) = dbh()->selectrow_array('select qualifier_type, qualifier from feature where ufi = ?', {}, $_);
+    print "$_: $name";
+    print " $qt $q" if ($qt);
+    print " ", $possibles{$_}->[0], "\n";
+    last if (++$n == 10);
+}

@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.5 2005-07-11 16:05:09 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.6 2005-07-15 12:12:27 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -22,6 +22,16 @@ use mySociety::DBHandle qw(dbh);
 use Gaze;
 
 mySociety::DBHandle::configure(Name => 'gaze', User => 'gaze');
+
+# strip_punctuation NAME
+# Remove punctuation from NAME. This is used to broaden our search for
+# ambiguous names; we want to treat, e.g., "St Peters" as ambiguous with "St.
+# Peter's", or "Le Petit-Paris" with "Le Petit Paris".
+sub strip_punctuation ($) {
+    my $t = shift;
+    $t =~ s#[^[:alpha:]]##g;
+    return $t;
+}
 
 # Grab the list of "ADM1" administrative regions.
 open(ADM1, "/tmp/geonames/_fips_adm1_code_def_2.txt");
@@ -83,7 +93,9 @@ my %UFI_name;
 
 # Each record describes a name and a feature. Each feature may have multiple
 # names.
+my $nf = 0;
 while (my $line = <STDIN>) {
+    print STDERR "\rReading names: ", ++$nf;
     chomp($line);
     my @fields = split(/\t/, $line);
     my %fields = map { $_ => trim(shift(@fields)) } @fieldnames;
@@ -135,13 +147,17 @@ while (my $line = <STDIN>) {
 
     $seen_UFI{$fields{UFI}} = 1;
 }
+print STDERR "\n";
 
 my %UFI_by_primary_name;
 my %primary_name_by_UFI;
 my %ambiguous_primary_names;
 
-# Identify the primary name for each place.
+# Identify the primary name for each place and write all the names into the
+# database.
+my $np = 0;
 foreach my $ufi (keys(%UFI_name)) {
+    print STDERR "\rDeriving primary names: ", ++$np, "/", scalar(keys(%UFI_name));
     my $nn = $UFI_name{$ufi};
     my @names = sort { $name_type_preference{$nn->{$a}->[0]} <=> $name_type_preference{$nn->{$b}->[0]} } keys(%$nn);
     my $primary_name = $names[0];
@@ -159,11 +175,12 @@ foreach my $ufi (keys(%UFI_name)) {
     }
 
     $primary_name_by_UFI{$ufi} = $primary_name;
-    push(@{$UFI_by_primary_name{lc($primary_name)}}, $ufi);
-    if (@{$UFI_by_primary_name{lc($primary_name)}} > 1) {
-        $ambiguous_primary_names{lc($primary_name)} ||= 1;
-    }
+    my $s = lc(strip_punctuation($primary_name));
+    push(@{$UFI_by_primary_name{$s}}, $ufi);
+    $ambiguous_primary_names{$s} ||= 1
+        if (@{$UFI_by_primary_name{$s}} > 1);
 }
+print STDERR "\n";
 
 my @UFIs_in_lat_order = sort { $data_by_UFI{$a}->{LAT} <=> $data_by_UFI{$b}->{LAT} } keys(%data_by_UFI);
 use constant R_e => 6372.8; # radius of the earth in km
@@ -219,13 +236,13 @@ sub find_places_near ($$$) {
     }
     $ind_h = $h;
 
-#print "lat = ", $lat, " l = $ind_l, h = $ind_h, lat_lo = $data_by_UFI{$UFIs_in_lat_order[$ind_l]}->{LAT} (vs $lat_l), lat_hi = $data_by_UFI{$UFIs_in_lat_order[$ind_h]}->{LAT} (vs $lat_h)\n";
-
     return grep { $_->[1] < $dist } map { [$_, distance($lat, $lon, $data_by_UFI{$_}->{LAT}, $data_by_UFI{$_}->{LONG})] } @UFIs_in_lat_order[$ind_l .. $ind_h];
 }
 
 # Decide on qualifiers for ambiguous names.
+my $na = 0;
 foreach my $primary_name (sort keys %ambiguous_primary_names) {
+    print STDERR "Finding qualifiers for ambiguous names: ", ++$na, "/", scalar(keys(%ambiguous_primary_names));
     my %adm1s;
     map { ++$adm1s{$data_by_UFI{$_}->{ADM1}} } @{$UFI_by_primary_name{$primary_name}};
     foreach my $ufi (@{$UFI_by_primary_name{$primary_name}}) {
@@ -265,7 +282,7 @@ foreach my $primary_name (sort keys %ambiguous_primary_names) {
         $n = 2 if ($n > 2);
         @nearby = @nearby[0 .. $n];
 
-        dbh()->do("update feature set qualifier_type = 'near', qualifier = ? where ufi = ?", {}, join(", ", map { $_->[0] } @nearby), $ufi);
+        dbh()->do("update feature set qualifier_type = 'near', qualifier = ? where ufi = ?", {}, join(", ", map { $primary_name_by_UFI{$_->[0]} } @nearby), $ufi);
     }
 }
 

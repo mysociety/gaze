@@ -5,7 +5,7 @@
 -- Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 -- Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 --
--- $Id: schema.sql,v 1.2 2005-07-08 16:13:14 chris Exp $
+-- $Id: schema.sql,v 1.3 2005-07-15 12:12:27 chris Exp $
 --
 
 create table feature (
@@ -28,6 +28,8 @@ create table feature (
     qualifier text
 );
 
+create index feature_country_idx on feature(country);
+
 create table name (
     uni integer not null primary key,
     ufi integer not null references feature(ufi),
@@ -40,6 +42,7 @@ create table name (
 --    language_code char(2) -- references language(code) ?
 );
 
+create index name_ufi_idx on name(ufi);
 create index name_full_name_idx on name(full_name);
 
 create table name_part (
