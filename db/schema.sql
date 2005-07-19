@@ -5,7 +5,7 @@
 -- Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 -- Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 --
--- $Id: schema.sql,v 1.3 2005-07-15 12:12:27 chris Exp $
+-- $Id: schema.sql,v 1.4 2005-07-19 11:12:08 francis Exp $
 --
 
 create table feature (
@@ -38,6 +38,10 @@ create table name (
     -- into the Latin alphabet and so are no good to us in, e.g., China or
     -- Russia.
     full_name text not null,
+    -- C - Conventional
+    -- N - Native
+    -- V - Variant or alternate
+    -- D - Not verified
     name_type char(1) check (name_type in ('C', 'D', 'N', 'V'))
 --    language_code char(2) -- references language(code) ?
 );
