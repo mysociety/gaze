@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.6 2005-07-15 12:12:27 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.7 2005-07-21 11:18:30 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -21,7 +21,7 @@ use mySociety::DBHandle qw(dbh);
 
 use Gaze;
 
-mySociety::DBHandle::configure(Name => 'gaze', User => 'gaze');
+mySociety::DBHandle::configure(Name => 'gaze', User => 'chris');
 
 # strip_punctuation NAME
 # Remove punctuation from NAME. This is used to broaden our search for
@@ -34,7 +34,7 @@ sub strip_punctuation ($) {
 }
 
 # Grab the list of "ADM1" administrative regions.
-open(ADM1, "/tmp/geonames/_fips_adm1_code_def_2.txt");
+open(ADM1, "../data/_fips_adm1_code_def_2.txt");
 binmode(ADM1, ":bytes");
 <ADM1>; # header
 
@@ -95,7 +95,7 @@ my %UFI_name;
 # names.
 my $nf = 0;
 while (my $line = <STDIN>) {
-    print STDERR "\rReading names: ", ++$nf;
+    print STDERR "Reading names: ", ++$nf, "\r";
     chomp($line);
     my @fields = split(/\t/, $line);
     my %fields = map { $_ => trim(shift(@fields)) } @fieldnames;
@@ -153,11 +153,46 @@ my %UFI_by_primary_name;
 my %primary_name_by_UFI;
 my %ambiguous_primary_names;
 
+# Number of names which contain each name part.
+my %name_part_counts;
+my $total_names = 0;
+
+# Count the number of times each possible name part appears in each name, so
+# that we can abandon name parts which are too common to be very useful.
+my $nc = 0;
+foreach my $ufi (keys(%UFI_name)) {
+    print STDERR "Counting name parts: ", ++$nc, "/", scalar(keys(%UFI_name)), "\r";
+    foreach (keys %{$UFI_name{$ufi}}) {
+        ++$total_names;
+        my $h = Gaze::split_name_parts($_);
+        foreach my $part (keys %$h) {
+            ++$name_part_counts{$part};
+        }
+    }
+}
+print STDERR "\n";
+
+my $threshold = 0;
+my $nn = 0;
+foreach my $ufi (keys(%UFI_name)) {
+    print STDERR "Finding relevance threshold: ", ++$nn, "/", scalar(keys(%UFI_name)), "\r";
+    foreach (keys %{$UFI_name{$ufi}}) {
+        my $min = $total_names;
+        my $h = Gaze::split_name_parts($_);
+        foreach my $part (keys %$h) {
+            $min = $name_part_counts{$part} if ($name_part_counts{$part} < $min); 
+        }
+        $threshold = $min if ($min > $threshold);
+    }
+}
+print STDERR "\n";
+print STDERR "Part count threshold: $threshold\n";
+
 # Identify the primary name for each place and write all the names into the
 # database.
 my $np = 0;
 foreach my $ufi (keys(%UFI_name)) {
-    print STDERR "\rDeriving primary names: ", ++$np, "/", scalar(keys(%UFI_name));
+    print STDERR "Deriving primary names: ", ++$np, "/", scalar(keys(%UFI_name)), "\r";
     my $nn = $UFI_name{$ufi};
     my @names = sort { $name_type_preference{$nn->{$a}->[0]} <=> $name_type_preference{$nn->{$b}->[0]} } keys(%$nn);
     my $primary_name = $names[0];
@@ -170,6 +205,14 @@ foreach my $ufi (keys(%UFI_name)) {
 
         my $h = Gaze::split_name_parts($_);
         foreach my $part (keys %$h) {
+            # XXX This is broken. We don't want to record names as falling
+            # under a part which conveys no information about them; for
+            # instance, the part "le" appears in some huge fraction of names
+            # in France, so doesn't tell us much about whether an individual
+            # name matches a query. However, where a name is identified only
+            # by parts which also appear in numerous other names, we do want
+            # to record that posting. There must be a better way to do this...
+            next if ($name_part_counts{$part} > $threshold);
             dbh()->do('insert into name_part (uni, namepart, count) values (?, ?, ?)', {}, $uni, $part, $h->{$part});
         }
     }
@@ -242,7 +285,7 @@ sub find_places_near ($$$) {
 # Decide on qualifiers for ambiguous names.
 my $na = 0;
 foreach my $primary_name (sort keys %ambiguous_primary_names) {
-    print STDERR "Finding qualifiers for ambiguous names: ", ++$na, "/", scalar(keys(%ambiguous_primary_names));
+    print STDERR "Finding qualifiers for ambiguous names: ", ++$na, "/", scalar(keys(%ambiguous_primary_names)), "\r";
     my %adm1s;
     map { ++$adm1s{$data_by_UFI{$_}->{ADM1}} } @{$UFI_by_primary_name{$primary_name}};
     foreach my $ufi (@{$UFI_by_primary_name{$primary_name}}) {
@@ -255,7 +298,6 @@ foreach my $primary_name (sort keys %ambiguous_primary_names) {
             my $d = distance($data_by_UFI{$ufi}->{LAT}, $data_by_UFI{$ufi}->{LONG}, $data_by_UFI{$ufi2}->{LAT}, $data_by_UFI{$ufi2}->{LONG});
             $mindist = $d if ($d < $mindist);
         }
-        print "\n";
 
         # ADM1 code of '00' means "general", so not useful for identifying
         # places. Therfore, we don't try to disambiguate place names by
@@ -285,5 +327,7 @@ foreach my $primary_name (sort keys %ambiguous_primary_names) {
         dbh()->do("update feature set qualifier_type = 'near', qualifier = ? where ufi = ?", {}, join(", ", map { $primary_name_by_UFI{$_->[0]} } @nearby), $ufi);
     }
 }
+
+print STDERR "\n";
 
 dbh()->commit();
