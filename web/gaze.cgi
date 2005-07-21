@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.1 2005-07-21 14:37:44 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.2 2005-07-21 16:00:17 chris Exp $';
 
 use strict;
 
@@ -28,7 +28,7 @@ use RABX;
 
 use mySociety::WatchUpdate;
 
-use EvEl;
+use Gaze;
 
 my $req = FCGI::Request();
 my $W = new mySociety::WatchUpdate();
