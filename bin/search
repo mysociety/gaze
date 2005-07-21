@@ -1,21 +1,27 @@
 #!/usr/bin/perl -w -I../perllib -I../../../perllib
 #
 # search:
+# Test search script.
 #
-# Copyright (c) 2005 FR Citizens Online Democracy. All rights reserved.
+# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: search,v 1.1 2005-07-15 12:12:27 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: search,v 1.2 2005-07-21 11:20:25 chris Exp $';
 
 use strict;
 require 5.8.0;
+
+use Time::HiRes qw(time);;
 
 use mySociety::DBHandle qw(dbh);
 
 use Gaze;
 
-mySociety::DBHandle::configure(Name => 'gaze', User => 'gaze');
+mySociety::DBHandle::configure(Name => 'gaze', User => 'chris');
+#dbh()->{TraceLevel} = 2;
+
+my $country = uc(shift(@ARGV));
 
 my $query = join(' ', @ARGV);
 print "query = [$query]\n";
@@ -26,19 +32,34 @@ print "terms: ", join(", ", map { "$terms->{$_} '$_'" } sort keys %$terms), "\n"
 my %possibles;
 my %count;
 my $s = dbh()->prepare("
-            select name.uni, name.ufi
+            select name_part.uni, name.ufi
             from name_part, name, feature
-            where name.uni = name_part.uni
-                and feature.ufi = name.ufi
-                and feature.country = 'FR'
+            where feature.ufi = name.ufi
+                and name.uni = name_part.uni
+                and feature.country = ?
                 and namepart = ?");
+my $A = 0;
 foreach my $t (keys %$terms) {
-    $s->execute($t);
-    $count{$t} ||= dbh()->selectrow_array("select count(name_part.uni) from name_part, name, feature where namepart = ? and name_part.uni = name.uni and name.ufi = feature.ufi and feature.country = 'FR'", {}, $t);
+    my $t1 = time();
+    $s->execute($country, $t);
+    printf STDERR "%s: %fs ", $t, time() - $t1;
+    $t1 = time();
+    $count{$t} ||= dbh()->selectrow_array("
+            select count(name_part.uni)
+            from name_part, name, feature
+            where namepart = ?
+                and name_part.uni = name.uni
+                and name.ufi = feature.ufi
+                and feature.country = ?",
+            {}, $t, $country);
+    printf STDERR "%fs %d\n", time() - $t1, $count{$t};
     while (my ($uni, $ufi) = $s->fetchrow_array()) {
-        $possibles{$ufi}->{$uni} += 1 / $count{$t}; # rather noddy relevance scoring
+        $possibles{$ufi}->{$uni} += $terms->{$t} / $count{$t}; # rather noddy relevance scoring
+        ++$A;
     }
 }
+
+print STDERR "$A loops\n";
 
 foreach my $ufi (keys %possibles) {
     my ($bestuni, $maxscore);
@@ -57,7 +78,10 @@ foreach (@ufis) {
     my $name = dbh()->selectrow_array('select full_name from name where is_primary and ufi = ?', {}, $_);
     my ($qt, $q) = dbh()->selectrow_array('select qualifier_type, qualifier from feature where ufi = ?', {}, $_);
     print "$_: $name";
-    print " $qt $q" if ($qt);
+    if ($qt) {
+        print " (near $q)" if ($qt eq 'near');
+        print ", $q" if ($qt eq 'in');
+    }
     print " ", $possibles{$_}->[0], "\n";
     last if (++$n == 10);
 }
