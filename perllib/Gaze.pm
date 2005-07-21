@@ -6,12 +6,27 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.2 2005-07-12 17:35:27 chris Exp $
+# $Id: Gaze.pm,v 1.3 2005-07-21 14:45:01 chris Exp $
 #
 
 package Gaze;
 
 use strict;
+
+use utf8;
+
+use mySociety::Config;
+use mySociety::DBHandle qw(dbh);
+
+BEGIN {
+    mySociety::DBHandle::configure(
+            Name => mySociety::Config::get('GAZE_DB_NAME'),
+            User => mySociety::Config::get('GAZE_DB_USER'),
+            Password => mySociety::Config::get('GAZE_DB_PASS'),
+            Host => mySociety::Config::get('GAZE_DB_HOST', undef),
+            Port => mySociety::Config::get('GAZE_DB_PORT', undef)
+        );
+}
 
 use constant name_part_size => 3;
 
@@ -56,12 +71,69 @@ sub split_name_parts ($) {
     return \%parts;
 }
 
-=item find_places COUNTRY TERM
+=item find_places COUNTRY QUERY [MAXRESULTS]
 
-Search for places in COUNTRY (ISO code) which match the given search TERM.
+Search for places in COUNTRY (ISO code) which match the given search QUERY.
+Returns a reference to a list of [NAME, QUALIFICATION, QUALIFIER, LATITUDE,
+LONGITUDE]. When NAME is unique, QUALIFICATION and QUALIFIER will be undef;
+otherwise, QUALIFICATION will either be 'in' and QUALIFIER the name of an
+enclosing administrative area (for instance, a state or county), or 'near' and
+the names of nearby places, respectively. LATITUDE and LONGITUDE are in decimal
+degrees, north- and east-positive, in WGS84. Earlier entries in the returned
+list are better matches to the query. At most MAXRESULTS (default, 10) results
+are returned. On error, throws an exception.
 
 =cut
-sub find_places ($$) {
+sub find_places ($$;$) {
+    my ($country, $query, $maxresults) = @_;
+    $maxresults ||= 10;
+    my $terms = Gaze::split_name_parts($query);
+    my %possibles;
+
+    our $s ||= dbh()->prepare("
+        select name_part.uni, name.ufi
+        from name_part, name, feature
+        where feature.ufi = name.ufi
+            and name.uni = name_part.uni
+            and feature.country = ?
+            and namepart = ?");
+        
+    foreach my $t (keys %$terms) {
+        my $count = dbh()->selectrow_array('
+                select count(name_part.uni)
+                    from name_part, name, feature
+                    where namepart = ?
+                        and name_part.uni = name.uni
+                        and name.ufi = feature.ufi
+                        and feature.country = ?',
+                {}, $t, $country);
+        $s->execute($country, $t);
+        while (my ($uni, $ufi) = $s->fetchrow_array()) {
+            $possibles{$ufi}->{$uni} += $terms->{$t} / $count;
+        }
+    }
+
+    # Use as the score for each place the best score for any of its names.
+    foreach my $ufi (keys %possibles) {
+        my ($bestuni, $maxscore);
+        foreach my $uni (keys %{$possibles{$ufi}}) {
+            if (!defined($bestuni) || $possibles{$ufi}->{$uni} > $maxscore) {
+                $bestuni = $uni;
+                $maxscore = $possibles{$ufi}->{$uni};
+            }
+        }
+        $possibles{$ufi} = [$maxscore, $bestuni];
+    }
+
+    my @r = ( );
+    my @ufis = sort { $possibles{$b}->[0] <=> $possibles{$a}->[0] } keys %possibles;
+    for (my $i = 0; $i < $maxresults && $i < @ufis; ++$i) {
+        my $name = dbh()->selectrow_array('select full_name from name where is_primary and ufi = ?', {}, $_);
+        my ($qt, $q, $lat, $lon) = dbh()->selectrow_array('select qualifier_type, qualifier, lat, lon from feature where ufi = ?', {}, $_);
+        push(@r, [$name, $qt, $q, $lat, $lon]);
+    }
+
+    return \@r;
 }
 
 1;
