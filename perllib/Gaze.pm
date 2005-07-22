@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.4 2005-07-22 12:39:50 francis Exp $
+# $Id: Gaze.pm,v 1.5 2005-07-22 13:57:40 francis Exp $
 #
 
 package Gaze;
@@ -17,6 +17,7 @@ use utf8;
 
 use mySociety::Config;
 use mySociety::DBHandle qw(dbh);
+use Geo::IP;
 
 BEGIN {
     mySociety::DBHandle::configure(
@@ -146,6 +147,22 @@ sub find_places ($$;$) {
     }
 
     return \@r;
+}
+
+=item get_country_from_ip ADDRESS
+
+Return the country code for the given IP address, or undef if none could be
+found.
+
+=cut
+sub get_country_from_ip ($) {
+    my ($addr) = @_;
+    return undef if $addr eq '127.0.0.1';
+    our $geoip;
+    $geoip ||= new Geo::IP(GEOIP_STANDARD);
+    my $country = $geoip->country_code_by_addr($addr);
+    # warn "ip: $addr country: $country";
+    return $country;
 }
 
 1;
