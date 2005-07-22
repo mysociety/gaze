@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.3 2005-07-21 14:45:01 chris Exp $
+# $Id: Gaze.pm,v 1.4 2005-07-22 12:39:50 francis Exp $
 #
 
 package Gaze;
@@ -30,12 +30,24 @@ BEGIN {
 
 use constant name_part_size => 3;
 
-=item split_name_parts NAME
+=head1 NAME
 
-Given the NAME of a place, return a reference to a hash mapping "name parts"
-(substrings, essentially) of that name to the number of times they occur in it.
+Gaze
+
+=head1 DESCRIPTION
+
+Implementation of Gaze
+
+=head1 FUNCTIONS
+
+=over 4
 
 =cut
+
+# split_name_parts NAME
+#
+# Given the NAME of a place, return a reference to a hash mapping "name parts"
+# (substrings, essentially) of that name to the number of times they occur in it.
 sub split_name_parts ($) {
     my $name = lc(shift);
     #
