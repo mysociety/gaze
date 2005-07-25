@@ -5,7 +5,7 @@
 -- Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 -- Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 --
--- $Id: schema.sql,v 1.5 2005-07-19 11:19:26 francis Exp $
+-- $Id: schema.sql,v 1.6 2005-07-25 15:35:37 chris Exp $
 --
 
 create table feature (
@@ -19,13 +19,9 @@ create table feature (
             or (populated_place_classification >= 1
                 and populated_place_classification <= 5)
         ),
-    qualifier_type text check (
-            qualifier_type is null
-            or qualifier_type = 'in'
-            or qualifier_type = 'near'
-        ),
-    -- either the name of an enclosing region, or a short list of nearby places
-    qualifier text
+    -- where a placename is ambiguous, qualify it with extra information
+    in_qualifier text,  -- name of enclosing region in which this place lies
+    near_qualifier text -- names of nearby places
 );
 
 create index feature_country_idx on feature(country);
