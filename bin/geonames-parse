@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.10 2005-07-25 15:08:43 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.11 2005-07-25 15:09:45 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -229,7 +229,7 @@ my @UFIs_in_lat_order = sort { $data_by_UFI{$a}->{LAT} <=> $data_by_UFI{$b}->{LA
 # LON).
 sub find_places_near ($$$) {
     my ($lat, $lon, $dist) = @_;
-    my ($lat_l, $lat_h) = ($lat - deg($dist / Gaze::R_e), $lat + deg($dist / Gaze::R_e));
+    my ($lat_l, $lat_h) = ($lat - Gaze::deg($dist / Gaze::R_e), $lat + Gaze::deg($dist / Gaze::R_e));
     my ($ind_l, $ind_h);    # Bracketing indexes for search in list of UFIs
 
     # Find low limit of UFIs.
