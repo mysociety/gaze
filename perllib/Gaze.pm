@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.5 2005-07-22 13:57:40 francis Exp $
+# $Id: Gaze.pm,v 1.6 2005-07-25 17:13:40 chris Exp $
 #
 
 package Gaze;
@@ -18,6 +18,7 @@ use utf8;
 use mySociety::Config;
 use mySociety::DBHandle qw(dbh);
 use Geo::IP;
+use POSIX qw(acos);
 
 BEGIN {
     mySociety::DBHandle::configure(
@@ -163,6 +164,42 @@ sub get_country_from_ip ($) {
     my $country = $geoip->country_code_by_addr($addr);
     # warn "ip: $addr country: $country";
     return $country;
+}
+
+# Some conveniences for the parser.
+
+# strip_punctuation NAME
+# Remove punctuation from NAME. This is used to broaden our search for
+# ambiguous names; we want to treat, e.g., "St Peters" as ambiguous with "St.
+# Peter's", or "Le Petit-Paris" with "Le Petit Paris".
+sub strip_punctuation ($) {
+    my $t = shift;
+    $t =~ s#[^[:alpha:][0-9]]##g; # [0-9] because US place names quite commonly contain numbers
+    return $t;
+}
+
+use constant R_e => 6372.8; # radius of the earth in km
+use constant M_PI => 3.141592654;
+
+# rad DEGREES
+# Return DEGREES in radians.
+sub rad ($) {
+    return M_PI * $_[0] / 180.;
+}
+
+# deg RADIANS
+# Return RADIANS in degrees.
+sub deg ($) {
+    return 180. * $_[0] / M_PI;
+}
+
+# distance LAT1 LON2 LAT2 LON2
+# Return the great-circle distance between (LAT1, LON1) and (LAT2, LON2).
+sub distance ($$$$) {
+    my ($lat1, $lon1, $lat2, $lon2) = map { rad($_) } @_;
+    my $arg = sin($lat1) * sin($lat2) + cos($lat1) * cos($lat2) * cos($lon1 - $lon2);
+    return 0 if (abs($arg) > 1); # XXX "shouldn't happen", but sometimes does when passed two equal places
+    return R_e * acos(sin($lat1) * sin($lat2) + cos($lat1) * cos($lat2) * cos($lon1 - $lon2));
 }
 
 1;

@@ -1,0 +1,212 @@
+#!/usr/bin/perl -w
+#
+# usgs-geonames-parse:
+# Parse USGS geonames data.
+#
+# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
+# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
+#
+
+my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.1 2005-07-25 17:13:40 chris Exp $';
+
+use strict;
+require 5.8.0;
+
+# Horrible boilerplate to set up appropriate library paths.
+use FindBin;
+use lib "$FindBin::Bin/../perllib";
+use lib "$FindBin::Bin/../../perllib";
+use lib "$FindBin::Bin/../../../perllib";
+
+use IO::File;
+use POSIX qw(acos);
+use Text::CSV;
+
+use mySociety::Config;
+BEGIN {
+    mySociety::Config::set_file("$FindBin::Bin/../../conf/general");
+}
+use mySociety::DBHandle qw(dbh);
+
+use Gaze;
+
+my %state_names;
+
+# Grab list of US state names.
+my $c = new Text::CSV;
+open(STATES, "$FindBin::Bin/../data/us-states.csv");
+while (my $line = <STATES>) {
+    $c->parse($line);
+    my ($abbr, $name) = $c->fields();
+    $state_names{$abbr} = $name;
+}
+close(STATES);
+
+# feature ID -> [name, state, county, lat, long]
+my %place;
+
+# canonicalised name to [feature ID, ...]
+my %name;
+
+# ambiguous names and corresponding IDs
+my %ambiguous;
+my %ambiguous_id;
+
+binmode(STDIN, ":bytes");
+while (defined(my $line = <STDIN>)) {
+    chomp($line);
+    my @f = split(/\|/, $line);
+    # Fields are:
+    #   feature ID
+    #   state code
+    #   feature name
+    #   feature type
+    #   county name
+    #   FIPS state number
+    #   FIPS county number
+    #   latitude (DMS)
+    #   longitude (DMS)
+    #   latitude (decimal)
+    #   longitude (decimal)
+    #   source latitude (DMS)   -- not sure what these are
+    #   source longitude (DMS)
+    #   source latitude (decimal)
+    #   source longitude (decimal)
+    #   elevation
+    #   estimated population
+    #   Federal status
+    #   cell name   -- which map sheet it's on, I think
+
+    # Only use 'populated places'
+    next unless ($f[3] eq 'ppl');
+
+    # Some places have no location.
+    next if ($f[7] eq 'UNKNOWN' || !defined($f[9]) || !defined($f[10]));
+
+    # http://geonames.usgs.gov/gnis_users_guide_descripdbs.html
+    # Two special terms are used in parentheses. The word historical signifies
+    # a feature that no longer exists, and the word subdivision indicates a
+    # named population cluster within another populated place or civil
+    # division.
+    #
+    # Drop historic names, but keep subdivisions.
+    next if ($f[2] =~ m# \(historical\)$#);
+
+    # Names are coded in Latin1, apparently.
+    utf8::upgrade($f[2]);
+    utf8::upgrade($f[4]);
+
+    # Strip the '(subdivision)' note.
+    $f[2] =~ s# \([a-z]+\)##;
+    
+    $place{$f[0]} = [$f[2], $f[1], $f[4], $f[9], $f[10]];
+
+    my $canon = lc(Gaze::strip_punctuation($f[2]));
+    push(@{$name{$canon}}, $f[0]);
+    if (@{$name{$canon}} > 1) {
+        $ambiguous{$canon} = @{$name{$canon}};
+        $ambiguous_id{$f[0]} = 1;
+    }
+}
+
+# There are duplicate places in the USGS databases -- i.e., places which are
+# listed under more than one name but are in the same or almost the same
+# place. We cull these by reducing them to a single reference.
+foreach my $id (keys(%ambiguous_id)) {
+    next if (!defined($id) || !exists($place{$id}));
+    my ($name, $state, $county, $lat, $lon) = @{$place{$id}};
+    my $canon = lc(Gaze::strip_punctuation($name));
+    
+    # Go through all the places with which this place's name is ambiguous;
+    # get rid of any which are within 250m of here.
+    foreach my $id2 (@{$name{$canon}}) {
+        next if ($id2 == $id);
+        my ($name2, $state2, $county2, $lat2, $lon2) = @{$place{$id2}};
+        if (Gaze::distance($lat, $lon, $lat2, $lon2) < 0.25) {
+            print STDERR "#$id $name, $county, $state is ambiguous with #$id2 $name2, $county2, $state2 and less than 250m from it; discarding #$id2\n";
+            delete $place{$id2};
+            delete $ambiguous_id{$id2};
+            @{$name{$canon}} = grep { $_ != $id2 } @{$name{$canon}};
+            if (@{$name{$canon}} == 1) {
+                delete $ambiguous_id{$id};
+                delete $ambiguous{$canon};
+            }
+        }
+    }
+}
+
+my @features_in_lat_order = sort { $place{$a}->[3] <=> $place{$b}->[3] } keys(%place);
+
+# find_places_near LAT LON DISTANCE
+# Return in list context [feature ID, distance] of places within DISTANCE km of
+# (LAT, LON).
+sub find_places_near ($$$) {
+    my ($lat, $lon, $dist) = @_;
+    my ($lat_l, $lat_h) = ($lat - Gaze::deg($dist / Gaze::R_e), $lat + Gaze::deg($dist / Gaze::R_e));
+    my ($ind_l, $ind_h);    # Bracketing indexes for search in list of UFIs
+
+    # Find low limit of UFIs.
+    my ($l, $h) = (0, $#features_in_lat_order);
+    while ($h > $l + 1) {
+        my $a = int(($h + $l) / 2);
+        my $id = $features_in_lat_order[$a];
+        my $ll = $place{$id}->[3];
+        if ($ll < $lat_l) {
+            $l = $a;
+        } else {
+            $h = $a;
+        }
+    }
+    $ind_l = $l;
+
+    ($l, $h) = (0, $#features_in_lat_order);
+    while ($h > $l + 1) {
+        my $a = int(($h + $l) / 2);
+        my $id = $features_in_lat_order[$a];
+        my $ll = $place{$id}->[3];
+        if ($ll > $lat_h) {
+            $h = $a;
+        } else {
+            $l = $a;
+        }
+    }
+    $ind_h = $h;
+
+    return grep { $_->[1] < $dist } map { [$_, Gaze::distance($lat, $lon, $place{$_}->[3], $place{$_}->[4])] } @features_in_lat_order[$ind_l .. $ind_h];
+}
+
+foreach my $id (keys(%place)) {
+    my ($name, $state, $county, $lat, $lon) = @{$place{$id}};
+    my $canon = lc(Gaze::strip_punctuation($name));
+    my $level = 'state';
+    if ($ambiguous{$canon}) {
+        foreach my $id2 (@{$name{$canon}}) {
+            if ($id2 != $id && $place{$id2}->[1] eq $state) {
+                if ($place{$id2}->[2] eq $county) {
+                    my $d = Gaze::distance($lat, $lon, $place{$id2}->[3], $place{$id2}->[4]);
+
+                    print STDERR "duplicate $name, $county, $state\n";
+                    print STDERR "  #$id at $lat, $lon\n";
+                    print STDERR "  #$id2 at $place{$id2}->[3], $place{$id2}->[4]\n";
+                    printf STDERR "  distance = %fkm\n", Gaze::distance($lat, $lon, $place{$id2}->[3], $place{$id2}->[4]);
+
+                    # Find some nearby places for disambiguation.
+                    my @disambig = grep { lc(Gaze::strip_punctuation($place{$_->[0]}->[0])) ne $canon && !$ambiguous_id{$_->[0]} } find_places_near($lat, $lon, $d / 2);
+
+                    if (@disambig == 0) {
+                        print STDERR "  no near-places to disambiguate\n";
+                    } else {
+                        print STDERR "  near:";
+                        for (my $i = 0; $i < @disambig && $i < 3; ++$i) {
+                            my $id3 = $disambig[$i]->[0];
+                            print STDERR " $place{$id3}->[0], $place{$id3}->[2], $place{$id3}->[1]";
+                            print STDERR ';' unless ($i == 2 || $i == $#disambig);
+                        }
+                        print STDERR "\n";
+                    }
+                }
+                $level = 'county';
+            }
+        }
+    }
+}
