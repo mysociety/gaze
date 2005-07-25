@@ -7,21 +7,27 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.7 2005-07-21 11:18:30 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.8 2005-07-25 08:35:30 chris Exp $';
 
 use strict;
 require 5.8.0;
+
+# Horrible boilerplate to set up appropriate library paths.
+use FindBin;
+use lib "$FindBin::Bin/../perllib";
+use lib "$FindBin::Bin/../../perllib";
 
 use IO::File;
 use POSIX qw(acos);
 use Text::CSV;
 
-#use mySociety::Config;
+use mySociety::Config;
+BEGIN {
+    mySociety::Config::set_file("$FindBin::Bin/../../conf/general");
+}
 use mySociety::DBHandle qw(dbh);
 
 use Gaze;
-
-mySociety::DBHandle::configure(Name => 'gaze', User => 'chris');
 
 # strip_punctuation NAME
 # Remove punctuation from NAME. This is used to broaden our search for
@@ -34,7 +40,7 @@ sub strip_punctuation ($) {
 }
 
 # Grab the list of "ADM1" administrative regions.
-open(ADM1, "../data/_fips_adm1_code_def_2.txt");
+open(ADM1, "$FindBin::Bin/../data/_fips_adm1_code_def_2.txt");
 binmode(ADM1, ":bytes");
 <ADM1>; # header
 
