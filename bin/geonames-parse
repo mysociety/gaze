@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.9 2005-07-25 12:30:59 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.10 2005-07-25 15:08:43 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -29,16 +29,6 @@ BEGIN {
 use mySociety::DBHandle qw(dbh);
 
 use Gaze;
-
-# strip_punctuation NAME
-# Remove punctuation from NAME. This is used to broaden our search for
-# ambiguous names; we want to treat, e.g., "St Peters" as ambiguous with "St.
-# Peter's", or "Le Petit-Paris" with "Le Petit Paris".
-sub strip_punctuation ($) {
-    my $t = shift;
-    $t =~ s#[^[:alpha:]]##g;
-    return $t;
-}
 
 # Grab the list of "ADM1" administrative regions.
 open(ADM1, "$FindBin::Bin/../data/_fips_adm1_code_def_2.txt");
@@ -225,7 +215,7 @@ foreach my $ufi (keys(%UFI_name)) {
     }
 
     $primary_name_by_UFI{$ufi} = $primary_name;
-    my $s = lc(strip_punctuation($primary_name));
+    my $s = lc(Gaze::strip_punctuation($primary_name));
     push(@{$UFI_by_primary_name{$s}}, $ufi);
     $ambiguous_primary_names{$s} ||= 1
         if (@{$UFI_by_primary_name{$s}} > 1);
@@ -233,30 +223,13 @@ foreach my $ufi (keys(%UFI_name)) {
 print STDERR "\n";
 
 my @UFIs_in_lat_order = sort { $data_by_UFI{$a}->{LAT} <=> $data_by_UFI{$b}->{LAT} } keys(%data_by_UFI);
-use constant R_e => 6372.8; # radius of the earth in km
-use constant M_PI => 3.141592654;
-
-sub rad ($) {
-    return M_PI * $_[0] / 180.;
-}
-
-sub deg ($) {
-    return 180. * $_[0] / M_PI;
-}
-
-# distance LAT1 LON2 LAT2 LON2
-# Return the great-circle distance between (LAT1, LON1) and (LAT2, LON2).
-sub distance ($$$$) {
-    my ($lat1, $lon1, $lat2, $lon2) = map { rad($_) } @_;
-    return R_e * acos(sin($lat1) * sin($lat2) + cos($lat1) * cos($lat2) * cos($lon1 - $lon2));
-}
 
 # find_places_near LAT LON DISTANCE
 # Return in list context [UFI, distance] of places within DISTANCE km of (LAT,
 # LON).
 sub find_places_near ($$$) {
     my ($lat, $lon, $dist) = @_;
-    my ($lat_l, $lat_h) = ($lat - deg($dist / R_e), $lat + deg($dist / R_e));
+    my ($lat_l, $lat_h) = ($lat - deg($dist / Gaze::R_e), $lat + deg($dist / Gaze::R_e));
     my ($ind_l, $ind_h);    # Bracketing indexes for search in list of UFIs
 
     # Find low limit of UFIs.
@@ -286,7 +259,7 @@ sub find_places_near ($$$) {
     }
     $ind_h = $h;
 
-    return grep { $_->[1] < $dist } map { [$_, distance($lat, $lon, $data_by_UFI{$_}->{LAT}, $data_by_UFI{$_}->{LONG})] } @UFIs_in_lat_order[$ind_l .. $ind_h];
+    return grep { $_->[1] < $dist } map { [$_, Gaze::distance($lat, $lon, $data_by_UFI{$_}->{LAT}, $data_by_UFI{$_}->{LONG})] } @UFIs_in_lat_order[$ind_l .. $ind_h];
 }
 
 # Decide on qualifiers for ambiguous names.
@@ -302,7 +275,7 @@ foreach my $primary_name (sort keys %ambiguous_primary_names) {
         my $mindist = 1e6;
         foreach my $ufi2 (@{$UFI_by_primary_name{$primary_name}}) {
             next if ($ufi == $ufi2);
-            my $d = distance($data_by_UFI{$ufi}->{LAT}, $data_by_UFI{$ufi}->{LONG}, $data_by_UFI{$ufi2}->{LAT}, $data_by_UFI{$ufi2}->{LONG});
+            my $d = Gaze::distance($data_by_UFI{$ufi}->{LAT}, $data_by_UFI{$ufi}->{LONG}, $data_by_UFI{$ufi2}->{LAT}, $data_by_UFI{$ufi2}->{LONG});
             $mindist = $d if ($d < $mindist);
         }
 
