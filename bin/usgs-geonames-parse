@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.1 2005-07-25 17:13:40 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.2 2005-07-26 13:04:51 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -21,6 +21,9 @@ use lib "$FindBin::Bin/../../../perllib";
 use IO::File;
 use POSIX qw(acos);
 use Text::CSV;
+use Text::LevenshteinXS;    # Levenshtein edit distance -- use XS version
+                            # because of bugs in pure perl version:
+                            # http://rt.cpan.org/NoAuth/Bug.html?id=13873
 
 use mySociety::Config;
 BEGIN {
@@ -53,7 +56,9 @@ my %ambiguous;
 my %ambiguous_id;
 
 binmode(STDIN, ":bytes");
+my $nr = 0;
 while (defined(my $line = <STDIN>)) {
+    print "Reading names: ", ++$nr, "\r";
     chomp($line);
     my @f = split(/\|/, $line);
     # Fields are:
@@ -108,34 +113,14 @@ while (defined(my $line = <STDIN>)) {
         $ambiguous_id{$f[0]} = 1;
     }
 }
+print STDERR "\n";
 
-# There are duplicate places in the USGS databases -- i.e., places which are
-# listed under more than one name but are in the same or almost the same
-# place. We cull these by reducing them to a single reference.
-foreach my $id (keys(%ambiguous_id)) {
-    next if (!defined($id) || !exists($place{$id}));
-    my ($name, $state, $county, $lat, $lon) = @{$place{$id}};
-    my $canon = lc(Gaze::strip_punctuation($name));
-    
-    # Go through all the places with which this place's name is ambiguous;
-    # get rid of any which are within 250m of here.
-    foreach my $id2 (@{$name{$canon}}) {
-        next if ($id2 == $id);
-        my ($name2, $state2, $county2, $lat2, $lon2) = @{$place{$id2}};
-        if (Gaze::distance($lat, $lon, $lat2, $lon2) < 0.25) {
-            print STDERR "#$id $name, $county, $state is ambiguous with #$id2 $name2, $county2, $state2 and less than 250m from it; discarding #$id2\n";
-            delete $place{$id2};
-            delete $ambiguous_id{$id2};
-            @{$name{$canon}} = grep { $_ != $id2 } @{$name{$canon}};
-            if (@{$name{$canon}} == 1) {
-                delete $ambiguous_id{$id};
-                delete $ambiguous{$canon};
-            }
-        }
-    }
-}
-
+# Spatial index to speed nearest-neighbour searches.
 my @features_in_lat_order = sort { $place{$a}->[3] <=> $place{$b}->[3] } keys(%place);
+
+# If a place appears to be duplicated, we delete the duplicates; but to avoid
+# having to regenerate the sorted list, mark them here.
+my %deleted;
 
 # find_places_near LAT LON DISTANCE
 # Return in list context [feature ID, distance] of places within DISTANCE km of
@@ -172,41 +157,99 @@ sub find_places_near ($$$) {
     }
     $ind_h = $h;
 
-    return grep { $_->[1] < $dist } map { [$_, Gaze::distance($lat, $lon, $place{$_}->[3], $place{$_}->[4])] } @features_in_lat_order[$ind_l .. $ind_h];
+    return grep { !exists($deleted{$_->[0]}) }
+            grep { $_->[1] < $dist }
+            map { [$_, Gaze::distance($lat, $lon, $place{$_}->[3], $place{$_}->[4])] }
+                @features_in_lat_order[$ind_l .. $ind_h];
 }
 
-foreach my $id (keys(%place)) {
+# Qualifications we use for places which have duplicate names within a county.
+my (%near_qualifier);
+
+my $nd = 0;
+                    # sort so that diagnostic output groups places by name
+foreach my $id (sort { $place{$a}->[0] cmp $place{$b}->[0] } keys(%ambiguous_id)) {
+    print STDERR "Disambiguating names: ", ++$nd, "/", scalar(keys(%ambiguous_id)), "\r";
+    next if (exists($deleted{$id}));
     my ($name, $state, $county, $lat, $lon) = @{$place{$id}};
     my $canon = lc(Gaze::strip_punctuation($name));
-    my $level = 'state';
-    if ($ambiguous{$canon}) {
-        foreach my $id2 (@{$name{$canon}}) {
-            if ($id2 != $id && $place{$id2}->[1] eq $state) {
-                if ($place{$id2}->[2] eq $county) {
-                    my $d = Gaze::distance($lat, $lon, $place{$id2}->[3], $place{$id2}->[4]);
 
-                    print STDERR "duplicate $name, $county, $state\n";
-                    print STDERR "  #$id at $lat, $lon\n";
-                    print STDERR "  #$id2 at $place{$id2}->[3], $place{$id2}->[4]\n";
-                    printf STDERR "  distance = %fkm\n", Gaze::distance($lat, $lon, $place{$id2}->[3], $place{$id2}->[4]);
+    # Find the other places within the same state and county.
+                    # sort in order of distance from this place
+    my @others = sort { $a->[1] <=> $b->[1] }
+                    # compute distances
+                    map { [$_, Gaze::distance($lat, $lon, $place{$_}->[3], $place{$_}->[4]) ] }
+                    # find places with the same name in this county
+                    grep { $_ != $id
+                            && !exists($deleted{$id})
+                            && $place{$_}->[1] eq $state
+                            && $place{$_}->[2] eq $county }
+                    @{$name{$canon}};
 
-                    # Find some nearby places for disambiguation.
-                    my @disambig = grep { lc(Gaze::strip_punctuation($place{$_->[0]}->[0])) ne $canon && !$ambiguous_id{$_->[0]} } find_places_near($lat, $lon, $d / 2);
+    # Possibly the name is not or no longer ambiguous with others in the same county.
+    next if (@others == 0);
 
-                    if (@disambig == 0) {
-                        print STDERR "  no near-places to disambiguate\n";
-                    } else {
-                        print STDERR "  near:";
-                        for (my $i = 0; $i < @disambig && $i < 3; ++$i) {
-                            my $id3 = $disambig[$i]->[0];
-                            print STDERR " $place{$id3}->[0], $place{$id3}->[2], $place{$id3}->[1]";
-                            print STDERR ';' unless ($i == 2 || $i == $#disambig);
-                        }
-                        print STDERR "\n";
-                    }
-                }
-                $level = 'county';
-            }
-        }
+    # The largest distance away that a disambiguating place may lie. Obviously
+    # it has to be closer to this place than it is to any of the others.
+    my $maxdist = $others[0]->[1] / 2;
+    $maxdist = 20 if ($maxdist > 20);
+    
+                    # sort in order of distance from this place
+    my @disambig = sort { $a->[1] <=> $b->[1] }
+                    # places within $maxdist of here which are not deleted and
+                    # are not themselves ambiguously named, and whose names are
+                    # not very similar to this place's (there are typos in the
+                    # USGS data)
+                    grep {
+                        $_->[0] != $id
+                        && !exists($deleted{$_->[0]})
+                        && !exists($ambiguous_id{$_->[0]})
+                        && Text::LevenshteinXS::distance($name, $place{$_->[0]}->[0]) > (length($name) / 4.)
+                    } find_places_near($lat, $lon, $maxdist);
+
+    if (@disambig == 0) {
+        print STDERR "#$id $name, $county, $state: no disambiguating names within ${maxdist}km; skipping\n";
+        $deleted{$id} = 1;
+    } else {
+        my $n = @disambig > 3 ? 3 : @disambig;
+        $near_qualifier{$id} = join(', ', map { $place{$_->[0]}->[0] } @disambig[0 .. $n - 1]);
+#        print STDERR "#$id $name, $county, $state: 'near $near_qualifier{$id}'\n";
     }
 }
+print STDERR "\n";
+
+print STDERR "Will skip ", scalar(keys(%deleted)), "/", scalar(keys(%place)), " names\n";
+
+# Count name parts to decide which ones we can abandon.
+my %name_part_counts;
+
+my $nc = 0;
+foreach my $id (keys %place) {
+    print STDERR "Counting name parts: ", ++$nc, "/", scalar(keys(%place)), "\r";
+    next if (exists($deleted{$id}));
+    my $h = Gaze::split_name_parts($place{$id}->[0]);
+    foreach my $part (keys %$h) {
+        ++$name_part_counts{$part};
+    }
+}
+
+my $nw = 0;
+foreach my $id (keys %place) {
+    print STDERR "Storing names: ", ++$nw, "/", scalar(keys(%place)), "\r";
+    next if (exists($deleted{$id}));
+
+    my ($name, $state, $county, $lat, $lon) = @{$place{$id}};
+    my $ufi = $id + 100_000_000;
+
+    dbh()->do("insert into feature (ufi, country, lat, lon, in_qualifier, near_qualifier) values (?, 'US', ?, ?, ?, ?)", {}, $ufi, $lat, $lon, "$county, $state", $near_qualifier{$id});
+    dbh()->do("insert into name (ufi, uni, is_primary, full_name, name_type) values (?, ?, true, ?, 'C')", {}, $ufi, $ufi, $name);
+
+    my $h = Gaze::split_name_parts($name);
+    foreach my $part (keys %$h) {
+        next if ($name_part_counts{$part} > 0.05 * scalar(keys(%place)));
+        dbh()->do("insert into name_part (uni, namepart, count) values (?, ?, ?)", {}, $ufi, $part, $h->{$part});
+    }
+}
+print "\n";
+
+dbh()->commit();

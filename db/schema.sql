@@ -5,11 +5,11 @@
 -- Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 -- Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 --
--- $Id: schema.sql,v 1.6 2005-07-25 15:35:37 chris Exp $
+-- $Id: schema.sql,v 1.7 2005-07-26 13:04:51 chris Exp $
 --
 
 create table feature (
-    ufi integer not null primary key,
+    ufi integer not null primary key,   -- values above 100,000,000 used for USGS data
     country char(2) not null, -- references country(iso_code),
     -- coordinates in WGS84
     lat double precision not null,
