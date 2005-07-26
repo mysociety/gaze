@@ -1,0 +1,59 @@
+#!/usr/bin/perl -w
+#
+# xapian-index:
+# Index placenames into a Xapian index.
+#
+# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
+# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
+#
+
+my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.1 2005-07-26 18:43:28 chris Exp $';
+
+use strict;
+require 5.8.0;
+
+# Horrible boilerplate to set up appropriate library paths.
+use FindBin;
+use lib "$FindBin::Bin/../perllib";
+use lib "$FindBin::Bin/../../perllib";
+use lib "$FindBin::Bin/../../../perllib";
+
+use IO::File;
+use POSIX qw(acos);
+use Search::Xapian qw(:standard);
+
+use mySociety::Config;
+BEGIN {
+    mySociety::Config::set_file("$FindBin::Bin/../../conf/general");
+}
+use mySociety::DBHandle qw(dbh);
+
+use Gaze;
+
+die "should be called with exactly two arguments: country code, and location to write index files\n"
+if (@ARGV != 2);
+
+my ($country, $index) = @_;
+
+my $X = new Search::Xapian::WritableDatabase($index, Search::Xapian::DB_CREATE_OR_OPEN);
+
+my $N = dbh()->selectrow_array('select count(name.uni) from name, feature where name.ufi = feature.ufi and feature.country = ?', {}, $country);
+
+my $q = dbh()->prepare('select name.uni, full_name from name, feature where name.ufi = feature.ufi and feature.country = ?');
+$q->execute($country);
+my $nn = 0;
+while (my ($uni, $name) = $q->fetchrow_array()) {
+    print STDERR "Indexing names: ", ++$nn, "/", $N, "\r";
+    my $h = Gaze::split_name_parts($name);
+    my $d = new Search::Xapian::Document();
+    $d->set_data($uni);
+    foreach (keys %$h) {
+        $d->add_term($_, $h->{$_});
+    }
+
+    # Assume that we have not indexed it before.
+    $X->add_document($d);
+}
+print "\n";
+
+# commit of Xapian database is automatic?
