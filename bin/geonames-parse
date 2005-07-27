@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.11 2005-07-25 15:09:45 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.12 2005-07-27 10:44:34 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -92,7 +92,7 @@ my %UFI_name;
 # names.
 my $nf = 0;
 while (my $line = <STDIN>) {
-    print STDERR "Reading names: ", ++$nf, "\r";
+    print STDERR "Reading and storing names: ", ++$nf, "\r";
     chomp($line);
     my @fields = split(/\t/, $line);
     my %fields = map { $_ => trim(shift(@fields)) } @fieldnames;
@@ -128,7 +128,7 @@ while (my $line = <STDIN>) {
     if (!exists($data_by_UFI{$ufi})) {
         $data_by_UFI{$ufi} = \%fields;
         $fields{PC} = undef if ($fields{PC} eq '');
-        dbh()->do('insert into feature (ufi, country, lat, lon, populated_place_classification) values (?, ?, ?, ?, ?)', {}, $ufi, map { $fields{$_} } qw(CC1 LAT LONG PC));
+        dbh()->do('insert into feature (ufi, country, lat, lon) values (?, ?, ?, ?)', {}, $ufi, map { $fields{$_} } qw(CC1 LAT LONG));
     }
 
     if (exists($UFI_name{$ufi}->{$name})) {
@@ -150,41 +150,6 @@ my %UFI_by_primary_name;
 my %primary_name_by_UFI;
 my %ambiguous_primary_names;
 
-# Number of names which contain each name part.
-my %name_part_counts;
-my $total_names = 0;
-
-# Count the number of times each possible name part appears in each name, so
-# that we can abandon name parts which are too common to be very useful.
-my $nc = 0;
-foreach my $ufi (keys(%UFI_name)) {
-    print STDERR "Counting name parts: ", ++$nc, "/", scalar(keys(%UFI_name)), "\r";
-    foreach (keys %{$UFI_name{$ufi}}) {
-        ++$total_names;
-        my $h = Gaze::split_name_parts($_);
-        foreach my $part (keys %$h) {
-            ++$name_part_counts{$part};
-        }
-    }
-}
-print STDERR "\n";
-
-my $threshold = 0;
-my $nn = 0;
-foreach my $ufi (keys(%UFI_name)) {
-    print STDERR "Finding relevance threshold: ", ++$nn, "/", scalar(keys(%UFI_name)), "\r";
-    foreach (keys %{$UFI_name{$ufi}}) {
-        my $min = $total_names;
-        my $h = Gaze::split_name_parts($_);
-        foreach my $part (keys %$h) {
-            $min = $name_part_counts{$part} if ($name_part_counts{$part} < $min); 
-        }
-        $threshold = $min if ($min > $threshold);
-    }
-}
-print STDERR "\n";
-print STDERR "Part count threshold: $threshold\n";
-
 # Identify the primary name for each place and write all the names into the
 # database.
 my $np = 0;
@@ -199,19 +164,6 @@ foreach my $ufi (keys(%UFI_name)) {
         my ($nt, $uni) = @{$nn->{$_}};
         dbh()->do('insert into name (uni, ufi, is_primary, full_name, name_type) values (?, ?, ?, ?, ?)', {}, $uni, $ufi, $f ? 'true' : 'false', $_, $nt);
         $f = 0;
-
-        my $h = Gaze::split_name_parts($_);
-        foreach my $part (keys %$h) {
-            # XXX This is broken. We don't want to record names as falling
-            # under a part which conveys no information about them; for
-            # instance, the part "le" appears in some huge fraction of names
-            # in France, so doesn't tell us much about whether an individual
-            # name matches a query. However, where a name is identified only
-            # by parts which also appear in numerous other names, we do want
-            # to record that posting. There must be a better way to do this...
-            next if ($name_part_counts{$part} > $threshold);
-            dbh()->do('insert into name_part (uni, namepart, count) values (?, ?, ?)', {}, $uni, $part, $h->{$part});
-        }
     }
 
     $primary_name_by_UFI{$ufi} = $primary_name;
@@ -280,18 +232,21 @@ foreach my $primary_name (sort keys %ambiguous_primary_names) {
         }
 
         # ADM1 code of '00' means "general", so not useful for identifying
-        # places. Therfore, we don't try to disambiguate place names by
+        # places. Therfore, we don't try to disambiguate place names purely by
         # enclosing administrative region if any of the variants has a '00'
-        # ADM1.
+        # ADM1. But always store the ADM1, even if it's not a disambiguator on
+        # its own.
+        dbh()->do('update feature set in_qualifier = ? where ufi = ?', {}, $ADM1_name{$place->{CC1}}->{$place->{ADM1}}, $ufi)
+            if ($place->{ADM1} ne '00');
+
         if (!exists($adm1s{'00'}) && $adm1s{$place->{ADM1}} == 1) {
             # None of the places has a 00 ADM1, and this is the only such place
-            # which is in this administrative division.
-            dbh()->do("update feature set qualifier_type = 'in', qualifier = ? where ufi = ?", {}, $ADM1_name{$place->{CC1}}->{$place->{ADM1}}, $ufi);
+            # which is in this administrative division, so we do not need a
+            # 'near' qualifier.
             next;
         }
 
-        $mindist = 10 if ($mindist < 10);
-#        $mindist = 10 if ($mindist > 10);
+        $mindist = 20 if ($mindist > 20);
         my @nearby = sort { $a->[1] <=> $b->[1] }
                         grep {
                             # Mustn't identify a place as being near another
@@ -304,7 +259,7 @@ foreach my $primary_name (sort keys %ambiguous_primary_names) {
         $n = 2 if ($n > 2);
         @nearby = @nearby[0 .. $n];
 
-        dbh()->do("update feature set qualifier_type = 'near', qualifier = ? where ufi = ?", {}, join(", ", map { $primary_name_by_UFI{$_->[0]} } @nearby), $ufi);
+        dbh()->do("update feature set near_qualifier = ? where ufi = ?", {}, join(", ", map { $primary_name_by_UFI{$_->[0]} } @nearby), $ufi);
     }
 }
 
