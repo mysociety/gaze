@@ -5,20 +5,16 @@
 -- Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 -- Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 --
--- $Id: schema.sql,v 1.7 2005-07-26 13:04:51 chris Exp $
+-- $Id: schema.sql,v 1.8 2005-07-27 09:16:40 chris Exp $
 --
 
 create table feature (
     ufi integer not null primary key,   -- values above 100,000,000 used for USGS data
-    country char(2) not null, -- references country(iso_code),
+    country char(2) not null,   -- references country(iso_code)?
+    state char(2),              -- optional; for USA
     -- coordinates in WGS84
     lat double precision not null,
     lon double precision not null,
-    populated_place_classification integer check (
-            populated_place_classification is null
-            or (populated_place_classification >= 1
-                and populated_place_classification <= 5)
-        ),
     -- where a placename is ambiguous, qualify it with extra information
     in_qualifier text,  -- name of enclosing region in which this place lies
     near_qualifier text -- names of nearby places
