@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.6 2005-07-25 17:13:40 chris Exp $
+# $Id: Gaze.pm,v 1.7 2005-07-27 15:51:59 chris Exp $
 #
 
 package Gaze;
@@ -19,6 +19,7 @@ use mySociety::Config;
 use mySociety::DBHandle qw(dbh);
 use Geo::IP;
 use POSIX qw(acos);
+use Search::Xapian qw(:ops);
 
 BEGIN {
     mySociety::DBHandle::configure(
@@ -49,7 +50,8 @@ Implementation of Gaze
 # split_name_parts NAME
 #
 # Given the NAME of a place, return a reference to a hash mapping "name parts"
-# (substrings, essentially) of that name to the number of times they occur in it.
+# (substrings, essentially) of that name to the number of times they occur in
+# it.
 sub split_name_parts ($) {
     my $name = lc(shift);
     #
@@ -63,8 +65,9 @@ sub split_name_parts ($) {
     #   of Of oF
     #
     my %parts;
-    my @words = split(/[^[:alpha:]]+/, $name);
+    my @words = split(/[^[:alpha:]0-9]+/, $name);
     foreach (@words) {
+        next if (length($_) == 0);
         if (length($_) <= name_part_size) {
             ++$parts{$_};
             if (length($_) > 1) {
@@ -85,69 +88,81 @@ sub split_name_parts ($) {
     return \%parts;
 }
 
-=item find_places COUNTRY QUERY [MAXRESULTS]
+=item find_places COUNTRY STATE QUERY [MAXRESULTS]
 
 Search for places in COUNTRY (ISO code) which match the given search QUERY.
-Returns a reference to a list of [NAME, QUALIFICATION, QUALIFIER, LATITUDE,
-LONGITUDE]. When NAME is unique, QUALIFICATION and QUALIFIER will be undef;
-otherwise, QUALIFICATION will either be 'in' and QUALIFIER the name of an
-enclosing administrative area (for instance, a state or county), or 'near' and
-the names of nearby places, respectively. LATITUDE and LONGITUDE are in decimal
+STATE, if specified, is a customary code for a top-level administrative
+subregion within the given COUNTRY; at present, this is only useful for the
+United States, and should be passed as undef otherwise.  Returns a reference to
+a list of [NAME, IN, NEAR, LATITUDE, LONGITUDE]. When IN is defined, it gives
+the name of a region in which the place lies; when NEAR is defined, it gives a
+short list of other places near to the returned place. These allow nonunique
+names to be disambiguated by the user.  LATITUDE and LONGITUDE are in decimal
 degrees, north- and east-positive, in WGS84. Earlier entries in the returned
 list are better matches to the query. At most MAXRESULTS (default, 10) results
 are returned. On error, throws an exception.
 
 =cut
-sub find_places ($$;$) {
-    my ($country, $query, $maxresults) = @_;
+sub find_places ($$$;$) {
+    my ($country, $state, $query, $maxresults) = @_;
     $maxresults ||= 10;
+
+    # Xapian databases for different countries.
+    our %X;
+    $X{$country} ||= new Search::Xapian::Database(mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/$country");
+    my $X = $X{$country};
+
+    # Collect matches from Xapian. In the case where we are searching with a
+    # state as well as a country, we may need to expand the number of results
+    # requested in order to find all those relevant (because matches for, say,
+    # Brooklyn, NY may be crowded out by matches for Brooklyns not in NY).
+    my ($match_start, $match_num);
+
+    # We coalesce matches by UFI for the case where there are several names per
+    # feature. For each feature we record the highest-scoring matching UNI, its
+    # score, and whether the matched name was the primary name.
+    my %uni;
+    my %score;
+    my %isprimary;
+
     my $terms = Gaze::split_name_parts($query);
-    my %possibles;
+    my $enq = $X->enquire(OP_OR, keys(%$terms));
 
-    our $s ||= dbh()->prepare("
-        select name_part.uni, name.ufi
-        from name_part, name, feature
-        where feature.ufi = name.ufi
-            and name.uni = name_part.uni
-            and feature.country = ?
-            and namepart = ?");
-        
-    foreach my $t (keys %$terms) {
-        my $count = dbh()->selectrow_array('
-                select count(name_part.uni)
-                    from name_part, name, feature
-                    where namepart = ?
-                        and name_part.uni = name.uni
-                        and name.ufi = feature.ufi
-                        and feature.country = ?',
-                {}, $t, $country);
-        $s->execute($country, $t);
-        while (my ($uni, $ufi) = $s->fetchrow_array()) {
-            $possibles{$ufi}->{$uni} += $terms->{$t} / $count;
+    while (keys(%score) < $maxresults) {
+        if (!defined($match_start)) {
+            $match_start = 0;
+            $match_num = $maxresults;
+        } else {
+            $match_start += $match_num;
+            $match_num += int($match_num / 2);
         }
-    }
+        my @matches = $enq->matches($match_start, $match_num);
 
-    # Use as the score for each place the best score for any of its names.
-    foreach my $ufi (keys %possibles) {
-        my ($bestuni, $maxscore);
-        foreach my $uni (keys %{$possibles{$ufi}}) {
-            if (!defined($bestuni) || $possibles{$ufi}->{$uni} > $maxscore) {
-                $bestuni = $uni;
-                $maxscore = $possibles{$ufi}->{$uni};
+        last if (@matches == 0);
+
+        foreach my $match (@matches) {
+            my $score = $match->get_percent();
+            my $uni = $match->get_document()->get_data();
+            my ($ufi, $isprimary);
+            if ($state) {
+                ($ufi, $isprimary) = dbh()->selectrow_array('select ufi, is_primary from name where uni = ? and (select state from feature where feature.ufi = name.ufi) = ?', {}, $uni, $state);
+            } else {
+                ($ufi, $isprimary) = dbh()->selectrow_array('select ufi, is_primary from name where uni = ?', {}, $uni);
+            }
+            if (defined($ufi) && (!exists($score{$ufi}) || $score{$ufi} < $score)) {
+                $score{$ufi} = $score;
+                $uni{$ufi} = $uni;
+                $isprimary{$ufi} = $isprimary;
             }
         }
-        $possibles{$ufi} = [$maxscore, $bestuni];
     }
 
-    my @r = ( );
-    my @ufis = sort { $possibles{$b}->[0] <=> $possibles{$a}->[0] } keys %possibles;
-    for (my $i = 0; $i < $maxresults && $i < @ufis; ++$i) {
-        my $name = dbh()->selectrow_array('select full_name from name where is_primary and ufi = ?', {}, $_);
-        my ($qt, $q, $lat, $lon) = dbh()->selectrow_array('select qualifier_type, qualifier, lat, lon from feature where ufi = ?', {}, $_);
-        push(@r, [$name, $qt, $q, $lat, $lon]);
+    my @results;
+    foreach my $ufi (sort { $score{$b} <=> $score{$a} || $isprimary{$b} <=> $isprimary{$a} } keys(%score)) {
+        push(@results, [dbh()->selectrow_array('select full_name, in_qualifier, near_qualifier, lat, lon from feature, name where feature.ufi = name.ufi and feature.ufi = ? and is_primary', {}, $ufi)]);
+        last if (@results == $maxresults);
     }
-
-    return \@r;
+    return \@results;
 }
 
 =item get_country_from_ip ADDRESS
