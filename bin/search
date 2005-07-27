@@ -7,19 +7,26 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: search,v 1.2 2005-07-21 11:20:25 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: search,v 1.3 2005-07-27 10:01:20 chris Exp $';
 
 use strict;
 require 5.8.0;
 
-use Time::HiRes qw(time);;
+# Horrible boilerplate to set up appropriate library paths.
+use FindBin;
+use lib "$FindBin::Bin/../perllib";
+use lib "$FindBin::Bin/../../perllib";
+use lib "$FindBin::Bin/../../../perllib";
 
+use Search::Xapian qw(:ops);
+
+use mySociety::Config;
+BEGIN {
+    mySociety::Config::set_file("$FindBin::Bin/../../conf/general");
+}
 use mySociety::DBHandle qw(dbh);
 
 use Gaze;
-
-mySociety::DBHandle::configure(Name => 'gaze', User => 'chris');
-#dbh()->{TraceLevel} = 2;
 
 my $country = uc(shift(@ARGV));
 
@@ -29,59 +36,31 @@ print "query = [$query]\n";
 my $terms = Gaze::split_name_parts($query);
 print "terms: ", join(", ", map { "$terms->{$_} '$_'" } sort keys %$terms), "\n";
 
-my %possibles;
-my %count;
-my $s = dbh()->prepare("
-            select name_part.uni, name.ufi
-            from name_part, name, feature
-            where feature.ufi = name.ufi
-                and name.uni = name_part.uni
-                and feature.country = ?
-                and namepart = ?");
-my $A = 0;
-foreach my $t (keys %$terms) {
-    my $t1 = time();
-    $s->execute($country, $t);
-    printf STDERR "%s: %fs ", $t, time() - $t1;
-    $t1 = time();
-    $count{$t} ||= dbh()->selectrow_array("
-            select count(name_part.uni)
-            from name_part, name, feature
-            where namepart = ?
-                and name_part.uni = name.uni
-                and name.ufi = feature.ufi
-                and feature.country = ?",
-            {}, $t, $country);
-    printf STDERR "%fs %d\n", time() - $t1, $count{$t};
-    while (my ($uni, $ufi) = $s->fetchrow_array()) {
-        $possibles{$ufi}->{$uni} += $terms->{$t} / $count{$t}; # rather noddy relevance scoring
-        ++$A;
-    }
+my $index = mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/$country";
+print "xapian index dir: $index\n";
+
+my $X = new Search::Xapian::Database(mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/$country");
+my $enq = $X->enquire(OP_OR, keys(%$terms));
+my @matches = $enq->matches(0, 20);
+
+print "got ", scalar(@matches), " matches\n";
+
+# Coalesce matches by UFI (for the case where there are several names per
+# feature, outside the US).
+my %possible;
+
+foreach my $match (@matches) {
+    my $score = $match->get_percent();
+    my $uni = $match->get_document()->get_data();
+    my $ufi = dbh()->selectrow_array('select ufi from name where uni = ?', {}, $uni);
+    $possible{$ufi} = $score if (!exists($possible{$ufi}) || $possible{$ufi} < $score);
 }
 
-print STDERR "$A loops\n";
-
-foreach my $ufi (keys %possibles) {
-    my ($bestuni, $maxscore);
-    foreach my $uni (keys %{$possibles{$ufi}}) {
-        if (!defined($bestuni) || $possibles{$ufi}->{$uni} > $maxscore) {
-            $bestuni = $uni;
-            $maxscore = $possibles{$ufi}->{$uni};
-        }
-    }
-    $possibles{$ufi} = [$maxscore, $bestuni];
-}
-
-my @ufis = sort { $possibles{$b}->[0] <=> $possibles{$a}->[0] } keys %possibles;
-my $n = 0;
-foreach (@ufis) {
-    my $name = dbh()->selectrow_array('select full_name from name where is_primary and ufi = ?', {}, $_);
-    my ($qt, $q) = dbh()->selectrow_array('select qualifier_type, qualifier from feature where ufi = ?', {}, $_);
-    print "$_: $name";
-    if ($qt) {
-        print " (near $q)" if ($qt eq 'near');
-        print ", $q" if ($qt eq 'in');
-    }
-    print " ", $possibles{$_}->[0], "\n";
-    last if (++$n == 10);
+foreach my $ufi (sort { $possible{$b} <=> $possible{$a} } keys(%possible)) {
+    my ($lat, $lon, $inq, $nearq) = dbh()->selectrow_array('select lat, lon, in_qualifier, near_qualifier from feature where ufi = ?', {}, $ufi);
+    my $name = dbh()->selectrow_array('select full_name from name where ufi = ? and is_primary', {}, $ufi);
+    print "$name";
+    print ", $inq" if ($inq);
+    print " (near $nearq)" if ($nearq);
+    printf " %.4f %.4f\n", $lat, $lon;
 }
