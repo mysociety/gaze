@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.2 2005-07-26 13:04:51 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.3 2005-07-27 10:01:39 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -88,6 +88,10 @@ while (defined(my $line = <STDIN>)) {
     # Some places have no location.
     next if ($f[7] eq 'UNKNOWN' || !defined($f[9]) || !defined($f[10]));
 
+    # Names are coded in Latin1, apparently.
+    utf8::upgrade($f[2]);
+    utf8::upgrade($f[4]);
+
     # http://geonames.usgs.gov/gnis_users_guide_descripdbs.html
     # Two special terms are used in parentheses. The word historical signifies
     # a feature that no longer exists, and the word subdivision indicates a
@@ -96,10 +100,6 @@ while (defined(my $line = <STDIN>)) {
     #
     # Drop historic names, but keep subdivisions.
     next if ($f[2] =~ m# \(historical\)$#);
-
-    # Names are coded in Latin1, apparently.
-    utf8::upgrade($f[2]);
-    utf8::upgrade($f[4]);
 
     # Strip the '(subdivision)' note.
     $f[2] =~ s# \([a-z]+\)##;
@@ -186,7 +186,8 @@ foreach my $id (sort { $place{$a}->[0] cmp $place{$b}->[0] } keys(%ambiguous_id)
                             && $place{$_}->[2] eq $county }
                     @{$name{$canon}};
 
-    # Possibly the name is not or no longer ambiguous with others in the same county.
+    # Possibly the name is not or no longer ambiguous with others in the same
+    # county.
     next if (@others == 0);
 
     # The largest distance away that a disambiguating place may lie. Obviously
@@ -220,19 +221,6 @@ print STDERR "\n";
 
 print STDERR "Will skip ", scalar(keys(%deleted)), "/", scalar(keys(%place)), " names\n";
 
-# Count name parts to decide which ones we can abandon.
-my %name_part_counts;
-
-my $nc = 0;
-foreach my $id (keys %place) {
-    print STDERR "Counting name parts: ", ++$nc, "/", scalar(keys(%place)), "\r";
-    next if (exists($deleted{$id}));
-    my $h = Gaze::split_name_parts($place{$id}->[0]);
-    foreach my $part (keys %$h) {
-        ++$name_part_counts{$part};
-    }
-}
-
 my $nw = 0;
 foreach my $id (keys %place) {
     print STDERR "Storing names: ", ++$nw, "/", scalar(keys(%place)), "\r";
@@ -241,15 +229,9 @@ foreach my $id (keys %place) {
     my ($name, $state, $county, $lat, $lon) = @{$place{$id}};
     my $ufi = $id + 100_000_000;
 
-    dbh()->do("insert into feature (ufi, country, lat, lon, in_qualifier, near_qualifier) values (?, 'US', ?, ?, ?, ?)", {}, $ufi, $lat, $lon, "$county, $state", $near_qualifier{$id});
+    dbh()->do("insert into feature (ufi, country, state, lat, lon, in_qualifier, near_qualifier) values (?, 'US', ?, ?, ?, ?, ?)", {}, $ufi, $state, $lat, $lon, "$county", $near_qualifier{$id});
     dbh()->do("insert into name (ufi, uni, is_primary, full_name, name_type) values (?, ?, true, ?, 'C')", {}, $ufi, $ufi, $name);
-
-    my $h = Gaze::split_name_parts($name);
-    foreach my $part (keys %$h) {
-        next if ($name_part_counts{$part} > 0.05 * scalar(keys(%place)));
-        dbh()->do("insert into name_part (uni, namepart, count) values (?, ?, ?)", {}, $ufi, $part, $h->{$part});
-    }
 }
-print "\n";
+print STDERR "\n";
 
 dbh()->commit();
