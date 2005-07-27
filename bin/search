@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: search,v 1.4 2005-07-27 12:58:25 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: search,v 1.5 2005-07-27 15:51:42 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -17,8 +17,6 @@ use FindBin;
 use lib "$FindBin::Bin/../perllib";
 use lib "$FindBin::Bin/../../perllib";
 use lib "$FindBin::Bin/../../../perllib";
-
-use Search::Xapian qw(:ops);
 
 use mySociety::Config;
 BEGIN {
@@ -38,64 +36,13 @@ if ($country =~ m/^([A-Z]{2}),([A-Z]{2})$/) {
 my $query = join(' ', @ARGV);
 print "query = [$query]\n";
 
-my $terms = Gaze::split_name_parts($query);
-print "terms: ", join(", ", map { "$terms->{$_} '$_'" } sort keys %$terms), "\n";
-
-my $index = mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/$country";
-print "xapian index dir: $index\n";
-
-my $X = new Search::Xapian::Database(mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/$country");
-
-# Collect matches from Xapian. In the case where we are searching with a state
-# as well as a country, we may need to expand the number of results requested
-# in order to find all those relevant (because matches for, say, Brooklyn, NY
-# may be crowded out by matches for Brooklyns not in NY).
-my ($match_start, $match_num);
-
-# We coalesce matches by UFI for the case where there are several names per
-# feature.
-my %possible;
-my %uni;
-
-my $enq = $X->enquire(OP_OR, keys(%$terms));
-
-while (keys(%possible) < 20) {
-    if (!defined($match_start)) {
-        $match_start = 0;
-        $match_num = 20;
-    } else {
-        $match_start += $match_num;
-        $match_num += int($match_num / 2);
-    }
-    my @matches = $enq->matches($match_start, $match_num);
-
-    print "got ", scalar(@matches), " matches\n";
-    last if (@matches == 0);
-
-    foreach my $match (@matches) {
-        my $score = $match->get_percent();
-        my $uni = $match->get_document()->get_data();
-        my $ufi;
-        if ($state) {
-            $ufi = dbh()->selectrow_array('select ufi from name where uni = ? and (select state from feature where feature.ufi = name.ufi) = ?', {}, $uni, $state);
-        } else {
-            $ufi = dbh()->selectrow_array('select ufi from name where uni = ?', {}, $uni);
-        }
-        if (defined($ufi) && (!exists($possible{$ufi}) || $possible{$ufi} < $score)) {
-            $uni{$ufi} = $uni;
-            $possible{$ufi} = $score;
-        }
-    }
-}
-
-foreach my $ufi (sort { $possible{$b} <=> $possible{$a} } keys(%possible)) {
-    my ($lat, $lon, $inq, $nearq, $state2) = dbh()->selectrow_array('select lat, lon, in_qualifier, near_qualifier, state from feature where ufi = ?', {}, $ufi);
-    my $name = dbh()->selectrow_array('select full_name from name where ufi = ? and is_primary', {}, $ufi);
+my $R = Gaze::find_places($country, $state, $query);
+foreach (@$R) { #my $ufi (sort { $possible{$b} <=> $possible{$a} } keys(%possible)) {
+    my ($name, $inq, $nearq, $lat, $lon) = @$_;
     print "$name";
     print ", $inq" if ($inq);
-    print ", $state2" if (!$state && $state2);
     print " (near $nearq)" if ($nearq);
     printf " %.4f %.4f\n", $lat, $lon;
-    print "    ", dbh()->selectrow_array('select full_name from name where uni = ?', {}, $uni{$ufi}), "\n";
     printf "    http://maps.google.com/maps?q=%f+%f\n", $lat, $lon;
 }
+
