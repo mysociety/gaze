@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.1 2005-07-26 18:43:28 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.2 2005-07-27 13:05:57 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -33,19 +33,24 @@ use Gaze;
 die "should be called with exactly two arguments: country code, and location to write index files\n"
 if (@ARGV != 2);
 
-my ($country, $index) = @_;
+my ($country, $index) = @ARGV;
 
 my $X = new Search::Xapian::WritableDatabase($index, Search::Xapian::DB_CREATE_OR_OPEN);
 
+print STDERR "Counting names... ";
 my $N = dbh()->selectrow_array('select count(name.uni) from name, feature where name.ufi = feature.ufi and feature.country = ?', {}, $country);
+print STDERR "$N total\n";
 
+print STDERR "Retrieving names... ";
 my $q = dbh()->prepare('select name.uni, full_name from name, feature where name.ufi = feature.ufi and feature.country = ?');
 $q->execute($country);
+print STDERR "done\n";
 my $nn = 0;
 while (my ($uni, $name) = $q->fetchrow_array()) {
     print STDERR "Indexing names: ", ++$nn, "/", $N, "\r";
     my $h = Gaze::split_name_parts($name);
     my $d = new Search::Xapian::Document();
+
     $d->set_data($uni);
     foreach (keys %$h) {
         $d->add_term($_, $h->{$_});
