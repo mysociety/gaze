@@ -5,7 +5,7 @@
 -- Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 -- Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 --
--- $Id: schema.sql,v 1.8 2005-07-27 09:16:40 chris Exp $
+-- $Id: schema.sql,v 1.9 2005-07-27 09:25:51 chris Exp $
 --
 
 create table feature (
@@ -40,15 +40,3 @@ create table name (
 
 create index name_ufi_idx on name(ufi);
 create index name_full_name_idx on name(full_name);
-
-create table name_part (
-    uni integer not null references name(uni),
-
-    -- Three letter substrings of name.full_name.  Letters are lowercase except
-    -- the first and last letter from the name, which is uppercase.
-    namepart varchar(16) not null,         -- three characters, but UNICODE, so make this longer in case of byte vs char problems
-
-    count integer not null
-);
-
-create index name_part_namepart_idx on name_part(namepart);
