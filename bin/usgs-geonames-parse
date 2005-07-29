@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.3 2005-07-27 10:01:39 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.4 2005-07-29 15:58:10 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -229,7 +229,7 @@ foreach my $id (keys %place) {
     my ($name, $state, $county, $lat, $lon) = @{$place{$id}};
     my $ufi = $id + 100_000_000;
 
-    dbh()->do("insert into feature (ufi, country, state, lat, lon, in_qualifier, near_qualifier) values (?, 'US', ?, ?, ?, ?, ?)", {}, $ufi, $state, $lat, $lon, "$county", $near_qualifier{$id});
+    dbh()->do("insert into feature (ufi, country, state, lat, lon, in_qualifier, near_qualifier) values (?, 'US', ?, ?, ?, ?, ?)", {}, $ufi, $state, $lat, $lon, "$county County", $near_qualifier{$id});
     dbh()->do("insert into name (ufi, uni, is_primary, full_name, name_type) values (?, ?, true, ?, 'C')", {}, $ufi, $ufi, $name);
 }
 print STDERR "\n";
