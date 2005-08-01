@@ -1,13 +1,17 @@
 #!/usr/bin/perl -w
 #
 # usgs-geonames-parse:
-# Parse USGS geonames data.
+# Parse USGS geonames data.  For non-US countries see geonames-parse.
+#
+# Pass input data in on pipe, no argumens.  Get files from here:
+# http://geonames.usgs.gov/stategaz/POP_PLACES_DECI.zip
+# http://geonames.usgs.gov/stategaz/POP_PLACES.zip
 #
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.4 2005-07-29 15:58:10 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.5 2005-08-01 22:54:59 francis Exp $';
 
 use strict;
 require 5.8.0;
