@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.12 2005-07-27 10:44:34 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.13 2005-08-01 10:07:00 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -47,6 +47,20 @@ while (my $line = <ADM1>) {
 }
 
 close(ADM1);
+
+# And mapping from FIPS country codes to ISO ones.
+open(CC, "$FindBin::Bin/../data/fips-10-4-to-iso-country-codes.csv");
+<CC>; # header
+
+my %fips_to_iso_country_code;
+
+while (my $line = <CC>) {
+    chomp($line);
+    my ($fips, $iso, $x) = split(/,/, $line);   # XXX should use Text::CSV
+    $fips_to_iso_country_code{$fips} = $iso;
+}
+
+close(CC);
 
 binmode(STDOUT, ":utf8");
 
@@ -99,6 +113,11 @@ while (my $line = <STDIN>) {
 
     # The only records we grab are those which describe populated places.
     next if ($fields{FC} ne 'P');
+
+    die "don't know ISO country code for '$fields{CC1}'"
+        unless (exists($fips_to_iso_country_code{$fields{CC1}}));
+
+    $fields{CC1} = $fips_to_iso_country_code{$fields{CC1}};
 
     # Check that the various names are valid UTF-8. Experiments suggest that
     # SORT_NAME and FULL_NAME_ND won't be (though I'm not sure how they are
