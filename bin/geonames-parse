@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.14 2005-08-01 22:54:59 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.15 2005-08-03 11:01:47 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -121,6 +121,7 @@ while (my $line = <STDIN>) {
     die "don't know ISO country code for '$fields{CC1}'"
         unless (exists($fips_to_iso_country_code{$fields{CC1}}));
 
+    $fields{fips_CC1} = $fields{CC1};
     $fields{CC1} = $fips_to_iso_country_code{$fields{CC1}};
 
     # Check that the various names are valid UTF-8. Experiments suggest that
@@ -259,7 +260,7 @@ foreach my $primary_name (sort keys %ambiguous_primary_names) {
         # enclosing administrative region if any of the variants has a '00'
         # ADM1. But always store the ADM1, even if it's not a disambiguator on
         # its own.
-        dbh()->do('update feature set in_qualifier = ? where ufi = ?', {}, $ADM1_name{$place->{CC1}}->{$place->{ADM1}}, $ufi)
+        dbh()->do('update feature set in_qualifier = ? where ufi = ?', {}, $ADM1_name{$place->{fips_CC1}}->{$place->{ADM1}}, $ufi)
             if ($place->{ADM1} ne '00');
 
         if (!exists($adm1s{'00'}) && $adm1s{$place->{ADM1}} == 1) {
