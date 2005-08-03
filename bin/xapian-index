@@ -12,7 +12,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.3 2005-08-01 22:54:59 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.4 2005-08-03 15:26:23 francis Exp $';
 
 use strict;
 require 5.8.0;
@@ -26,6 +26,7 @@ use lib "$FindBin::Bin/../../../perllib";
 use IO::File;
 use POSIX qw(acos);
 use Search::Xapian qw(:standard);
+use File::Path; # rmtree
 
 use mySociety::Config;
 BEGIN {
@@ -36,15 +37,20 @@ use mySociety::DBHandle qw(dbh);
 use Gaze;
 
 die "should be called with exactly one argument: country code\n" if (@ARGV != 1);
-
 my ($country) = @ARGV;
+die "Expected two capital letters for country code" if $country !~ m/^[A-Z][A-Z]$/;
 
-my $index = mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . '/' . $country;
-my $X = new Search::Xapian::WritableDatabase($index, Search::Xapian::DB_CREATE_OR_OPEN);
+my $db_final_name = mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . '/gazeidx-' . $country;
+my $db_temp_name = $db_final_name . '-new';
 
 print STDERR "Counting names... ";
 my $N = dbh()->selectrow_array('select count(name.uni) from name, feature where name.ufi = feature.ufi and feature.country = ?', {}, $country);
 print STDERR "$N total\n";
+die "None found for country '$country'" if $N < 1;
+
+# Create with temporary name
+if (-d $db_temp_name) { rmtree($db_temp_name) or die "couldn't remove '$db_temp_name'"; }
+my $X = new Search::Xapian::WritableDatabase($db_temp_name, Search::Xapian::DB_CREATE);
 
 print STDERR "Retrieving names... ";
 my $q = dbh()->prepare('select name.uni, full_name from name, feature where name.ufi = feature.ufi and feature.country = ?');
@@ -67,3 +73,8 @@ while (my ($uni, $name) = $q->fetchrow_array()) {
 print "\n";
 
 # commit of Xapian database is automatic?
+
+# Rename into place
+if (-d $db_final_name) { rmtree($db_final_name); }
+rename ($db_temp_name, $db_final_name);
+

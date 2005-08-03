@@ -4,14 +4,19 @@
 # Parse GEOnet Names Server data and load into gazetteer database.
 # This is for countries other than the US, for US see usgs-geonames-parse.
 #
-# Takes data on input pipe, no arguments.  Get country files here:
+# Takes data on input pipe, no arguments. The input file must contain all data
+# for one country. Any existing data for that country is removed from Gaze
+# first.
+#
+# Get country files here:
 #   http://earth-info.nga.mil/gns/html/cntry_files.html
+#
 #
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.15 2005-08-03 11:01:47 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.16 2005-08-03 15:26:23 francis Exp $';
 
 use strict;
 require 5.8.0;
@@ -109,8 +114,10 @@ my %UFI_name;
 # Each record describes a name and a feature. Each feature may have multiple
 # names.
 my $nf = 0;
+my @data;
+my $country = undef;
 while (my $line = <STDIN>) {
-    print STDERR "Reading and storing names: ", ++$nf, "\r";
+    print STDERR "Reading names: ", ++$nf, "\r";
     chomp($line);
     my @fields = split(/\t/, $line);
     my %fields = map { $_ => trim(shift(@fields)) } @fieldnames;
@@ -123,6 +130,26 @@ while (my $line = <STDIN>) {
 
     $fields{fips_CC1} = $fields{CC1};
     $fields{CC1} = $fips_to_iso_country_code{$fields{CC1}};
+
+    if (!$country) {
+        $country = $fields{CC1};
+    } else {
+        die "More than one country in file: $country $fields{CC1}\n" if $country ne $fields{CC1};
+    }
+
+    push @data, \%fields;
+}
+print STDERR "\n";
+
+# Delete existing data for the country
+dbh()->do('delete from name where ufi in (select ufi from feature where country = ?)', {}, $country);
+dbh()->do('delete from feature where country = ?', {}, $country);
+
+# Insert data into database
+$nf = 0;
+foreach my $fields (@data) {
+    print STDERR "Storing names: ", ++$nf, "\r";
+    my %fields = %$fields;
 
     # Check that the various names are valid UTF-8. Experiments suggest that
     # SORT_NAME and FULL_NAME_ND won't be (though I'm not sure how they are

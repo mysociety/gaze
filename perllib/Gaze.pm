@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.7 2005-07-27 15:51:59 chris Exp $
+# $Id: Gaze.pm,v 1.8 2005-08-03 15:26:23 francis Exp $
 #
 
 package Gaze;
@@ -109,7 +109,7 @@ sub find_places ($$$;$) {
 
     # Xapian databases for different countries.
     our %X;
-    $X{$country} ||= new Search::Xapian::Database(mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/$country");
+    $X{$country} ||= new Search::Xapian::Database(mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/gazeidx-$country");
     my $X = $X{$country};
 
     # Collect matches from Xapian. In the case where we are searching with a
