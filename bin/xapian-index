@@ -12,7 +12,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.4 2005-08-03 15:26:23 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.5 2005-08-03 15:39:16 francis Exp $';
 
 use strict;
 require 5.8.0;
@@ -72,7 +72,8 @@ while (my ($uni, $name) = $q->fetchrow_array()) {
 }
 print "\n";
 
-# commit of Xapian database is automatic?
+# Hopefully call destructor, and commit of Xapian database
+undef $X;
 
 # Rename into place
 if (-d $db_final_name) { rmtree($db_final_name); }
