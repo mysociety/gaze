@@ -16,7 +16,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.17 2005-08-08 16:40:52 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.18 2005-08-08 16:45:14 francis Exp $';
 
 use strict;
 require 5.8.0;
@@ -115,7 +115,6 @@ my %UFI_name;
 # names.
 my $nf = 0;
 my @data;
-my $country = undef;
 my %countries;
 while (my $line = <STDIN>) {
     print STDERR "Reading names: ", ++$nf, "\r";
