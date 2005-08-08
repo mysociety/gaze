@@ -5,8 +5,8 @@
 # This is for countries other than the US, for US see usgs-geonames-parse.
 #
 # Takes data on input pipe, no arguments. The input file must contain all data
-# for one country. Any existing data for that country is removed from Gaze
-# first.
+# for any countries within it. Any existing data for those country is removed
+# from Gaze first.
 #
 # Get country files here:
 #   http://earth-info.nga.mil/gns/html/cntry_files.html
@@ -16,7 +16,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.16 2005-08-03 15:26:23 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.17 2005-08-08 16:40:52 francis Exp $';
 
 use strict;
 require 5.8.0;
@@ -116,6 +116,7 @@ my %UFI_name;
 my $nf = 0;
 my @data;
 my $country = undef;
+my %countries;
 while (my $line = <STDIN>) {
     print STDERR "Reading names: ", ++$nf, "\r";
     chomp($line);
@@ -131,19 +132,17 @@ while (my $line = <STDIN>) {
     $fields{fips_CC1} = $fields{CC1};
     $fields{CC1} = $fips_to_iso_country_code{$fields{CC1}};
 
-    if (!$country) {
-        $country = $fields{CC1};
-    } else {
-        die "More than one country in file: $country $fields{CC1}\n" if $country ne $fields{CC1};
-    }
+    $countries{$fields{CC1}} = 1;
 
     push @data, \%fields;
 }
 print STDERR "\n";
 
 # Delete existing data for the country
-dbh()->do('delete from name where ufi in (select ufi from feature where country = ?)', {}, $country);
-dbh()->do('delete from feature where country = ?', {}, $country);
+print STDERR "Replacing data for countries: " . join(' ', keys %countries) . "\n";
+my $countries_clause = join(' ', map {"'".$_."'"} keys %countries);
+dbh()->do("delete from name where ufi in (select ufi from feature where country in ($countries_clause))", {});
+dbh()->do("delete from feature where country in ($countries_clause)", {});
 
 # Insert data into database
 $nf = 0;
