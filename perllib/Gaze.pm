@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.8 2005-08-03 15:26:23 francis Exp $
+# $Id: Gaze.pm,v 1.9 2005-08-09 15:55:41 francis Exp $
 #
 
 package Gaze;
@@ -20,6 +20,7 @@ use mySociety::DBHandle qw(dbh);
 use Geo::IP;
 use POSIX qw(acos);
 use Search::Xapian qw(:ops);
+use File::Find;
 
 BEGIN {
     mySociety::DBHandle::configure(
@@ -91,25 +92,30 @@ sub split_name_parts ($) {
 =item find_places COUNTRY STATE QUERY [MAXRESULTS]
 
 Search for places in COUNTRY (ISO code) which match the given search QUERY.
+The country must be from the list returned by get_find_places_countries.
 STATE, if specified, is a customary code for a top-level administrative
 subregion within the given COUNTRY; at present, this is only useful for the
-United States, and should be passed as undef otherwise.  Returns a reference to
-a list of [NAME, IN, NEAR, LATITUDE, LONGITUDE]. When IN is defined, it gives
-the name of a region in which the place lies; when NEAR is defined, it gives a
-short list of other places near to the returned place. These allow nonunique
-names to be disambiguated by the user.  LATITUDE and LONGITUDE are in decimal
-degrees, north- and east-positive, in WGS84. Earlier entries in the returned
-list are better matches to the query. At most MAXRESULTS (default, 10) results
-are returned. On error, throws an exception.
+United States, and should be passed as undef otherwise.  
+
+Returns a reference to a list of [NAME, IN, NEAR, LATITUDE, LONGITUDE]. When IN
+is defined, it gives the name of a region in which the place lies; when NEAR is
+defined, it gives a short list of other places near to the returned place.
+These allow nonunique names to be disambiguated by the user.  LATITUDE and
+LONGITUDE are in decimal degrees, north- and east-positive, in WGS84. Earlier
+entries in the returned list are better matches to the query. At most
+MAXRESULTS (default, 10) results are returned. On error, throws an exception.
 
 =cut
 sub find_places ($$$;$) {
     my ($country, $state, $query, $maxresults) = @_;
     $maxresults ||= 10;
+    throw RABX::Error("Country code must be exactly two capital letters") unless ($country =~ m/^[A-Z][A-Z]$/);
 
     # Xapian databases for different countries.
     our %X;
-    $X{$country} ||= new Search::Xapian::Database(mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/gazeidx-$country");
+    my $countryxapiandb = mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/gazeidx-$country";
+    throw RABX::Error("Gazeteer not available for $country") if (!-d $countryxapiandb);
+    $X{$country} ||= new Search::Xapian::Database($countryxapiandb);
     my $X = $X{$country};
 
     # Collect matches from Xapian. In the case where we are searching with a
@@ -165,6 +171,25 @@ sub find_places ($$$;$) {
     return \@results;
 }
 
+=item get_find_places_countries
+
+Return list of countries which find_places will work for.
+
+=cut
+sub get_find_places_countries() {
+    my $xapiandb_directory = mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR');
+
+    my @countries;
+    opendir(DIRHANDLE, $xapiandb_directory) or die "Couldn't opendir $xapiandb_directory";
+    while (defined($_ = readdir(DIRHANDLE))) {
+        if (m/^gazeidx-([A-Z][A-Z])$/) {
+            push @countries, $1;
+        }
+    };
+    closedir(DIRHANDLE);
+    return \@countries;
+}
+
 =item get_country_from_ip ADDRESS
 
 Return the country code for the given IP address, or undef if none could be
@@ -177,7 +202,6 @@ sub get_country_from_ip ($) {
     our $geoip;
     $geoip ||= new Geo::IP(GEOIP_STANDARD);
     my $country = $geoip->country_code_by_addr($addr);
-    # warn "ip: $addr country: $country";
     return $country;
 }
 

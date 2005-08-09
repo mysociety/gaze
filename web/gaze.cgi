@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.4 2005-07-29 16:05:56 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.5 2005-08-09 15:55:41 francis Exp $';
 
 use strict;
 
@@ -40,6 +40,9 @@ while ($req->Accept() >= 0) {
             },
             'Gaze.get_country_from_ip' => sub {
                 Gaze::get_country_from_ip($_[0]);
+            },
+            'Gaze.get_find_places_countries' => sub {
+                Gaze::get_find_places_countries();
             }
         );
     last if ($W->changed());
