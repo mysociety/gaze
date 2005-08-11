@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.9 2005-08-09 15:55:41 francis Exp $
+# $Id: Gaze.pm,v 1.10 2005-08-11 08:57:00 francis Exp $
 #
 
 package Gaze;
@@ -97,12 +97,12 @@ STATE, if specified, is a customary code for a top-level administrative
 subregion within the given COUNTRY; at present, this is only useful for the
 United States, and should be passed as undef otherwise.  
 
-Returns a reference to a list of [NAME, IN, NEAR, LATITUDE, LONGITUDE]. When IN
-is defined, it gives the name of a region in which the place lies; when NEAR is
-defined, it gives a short list of other places near to the returned place.
-These allow nonunique names to be disambiguated by the user.  LATITUDE and
-LONGITUDE are in decimal degrees, north- and east-positive, in WGS84. Earlier
-entries in the returned list are better matches to the query. At most
+Returns a reference to a list of [NAME, IN, NEAR, LATITUDE, LONGITUDE, STATE].
+When IN is defined, it gives the name of a region in which the place lies; when
+NEAR is defined, it gives a short list of other places near to the returned
+place.  These allow nonunique names to be disambiguated by the user.  LATITUDE
+and LONGITUDE are in decimal degrees, north- and east-positive, in WGS84.
+Earlier entries in the returned list are better matches to the query. At most
 MAXRESULTS (default, 10) results are returned. On error, throws an exception.
 
 =cut
@@ -165,7 +165,7 @@ sub find_places ($$$;$) {
 
     my @results;
     foreach my $ufi (sort { $score{$b} <=> $score{$a} || $isprimary{$b} <=> $isprimary{$a} } keys(%score)) {
-        push(@results, [dbh()->selectrow_array('select full_name, in_qualifier, near_qualifier, lat, lon from feature, name where feature.ufi = name.ufi and feature.ufi = ? and is_primary', {}, $ufi)]);
+        push(@results, [dbh()->selectrow_array('select full_name, in_qualifier, near_qualifier, lat, lon, state from feature, name where feature.ufi = name.ufi and feature.ufi = ? and is_primary', {}, $ufi)]);
         last if (@results == $maxresults);
     }
     return \@results;
