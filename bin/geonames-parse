@@ -16,7 +16,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.18 2005-08-08 16:45:14 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.19 2005-08-30 11:12:40 francis Exp $';
 
 use strict;
 require 5.8.0;
@@ -39,6 +39,8 @@ use mySociety::DBHandle qw(dbh);
 
 use Gaze;
 
+binmode(STDOUT, ":utf8");
+
 # Grab the list of "ADM1" administrative regions.
 open(ADM1, "$FindBin::Bin/../data/_fips_adm1_code_def_2.txt");
 binmode(ADM1, ":bytes");
@@ -60,18 +62,13 @@ close(ADM1);
 # And mapping from FIPS country codes to ISO ones.
 open(CC, "$FindBin::Bin/../data/fips-10-4-to-iso-country-codes.csv");
 <CC>; # header
-
 my %fips_to_iso_country_code;
-
 while (my $line = <CC>) {
     chomp($line);
     my ($fips, $iso, $x) = split(/,/, $line);   # XXX should use Text::CSV
     $fips_to_iso_country_code{$fips} = $iso;
 }
-
 close(CC);
-
-binmode(STDOUT, ":utf8");
 
 # Defined in http://earth-info.nga.mil/gns/html/gis.html
 my @fieldnames = qw(
@@ -80,50 +77,228 @@ my @fieldnames = qw(
         MOD_DATE
     );
 
-my %data_by_UFI;
+sub process_one_country($$) {
+    my ($country, $data) = @_;
+    print STDERR "\nCountry $country:\n";
 
-my %names_by_UFI;
-my %seen_UFI;
+    my %data_by_UFI;
 
-sub trim ($) {
-    my $x = shift;
-    $x =~ s/^\s+//;
-    $x =~ s/\s+$//;
-    return $x;
+    my %names_by_UFI;
+    my %seen_UFI;
+
+    sub trim ($) {
+        my $x = shift;
+        $x =~ s/^\s+//;
+        $x =~ s/\s+$//;
+        return $x;
+    }
+
+    my %name_type_exists;
+    my %name_types;
+
+    # Smaller numbers mean higher preference. These values are used: (a) to select
+    # the effective type of a name which is stated under more than one type; (b) to
+    # select the preferred "primary" name where names of several types are
+    # available.
+    my %name_type_preference = (
+            C => 0,         # Conventional
+            N => 1,         # Native
+            V => 2,         # Variant or alternate
+            D => 10         # Not verified
+        );
+
+    # Hash which maps UFI to reference to hash of name to name-type and UNI.
+    my %UFI_name;
+
+    # Insert data into database
+    my $nf = 0;
+    foreach my $fields (@$data) {
+        print STDERR "Storing names: ", ++$nf, "\r";
+        my %fields = %$fields;
+
+        # Check that the various names are valid UTF-8. Experiments suggest that
+        # SORT_NAME and FULL_NAME_ND won't be (though I'm not sure how they are
+        # actually coded), but happily we don't need those.
+        foreach (qw(SHORT_FORM GENERIC FULL_NAME)) {
+            if (!utf8::decode($fields{$_})) {
+                die "$_ name \"$fields{$_}\" for UFI $fields{UFI} UNI $fields{UNI} is not valid UTF-8";
+            }
+        }
+
+        my $name = $fields{FULL_NAME};
+        next if ($name =~ m#\(\(.*\)\)#);
+        die if ($name eq '');
+
+        # Change index reading order to normal reading order.
+        if ($name =~ /,/) {
+            print STDERR "$name -> ";
+            $name = join(' ', reverse(split(/,\s*/, $name)));
+            print STDERR "$name\n";
+        }
+        
+        my $ufi = $fields{UFI};
+        my $uni = $fields{UNI};
+        $UFI_name{$ufi} ||= { };
+        my $name_type = $fields{NT};
+
+        if (!exists($data_by_UFI{$ufi})) {
+            $data_by_UFI{$ufi} = \%fields;
+            $fields{PC} = undef if ($fields{PC} eq '');
+            dbh()->do('insert into feature (ufi, country, lat, lon) values (?, ?, ?, ?)', {}, $ufi, map { $fields{$_} } qw(CC1 LAT LONG));
+        }
+
+        if (exists($UFI_name{$ufi}->{$name})) {
+            warn "#$ufi already has name '$name', type $UFI_name{$ufi}->{$name}->[0]\n";
+            $UFI_name{$ufi}->{$name} = [$name_type, $uni]
+                if ($name_type_preference{$name_type} < $name_type_preference{$UFI_name{$ufi}->{$name}->[0]});
+        } else {
+            $UFI_name{$ufi}->{$name} = [$name_type, $uni];
+        }
+
+        $name_type_exists{$name_type} ||= 1;
+        ++$name_types{$name_type}->{$fields{NT}};
+
+        $seen_UFI{$fields{UFI}} = 1;
+    }
+    print STDERR "\n";
+
+    my %UFI_by_primary_name;
+    my %primary_name_by_UFI;
+    my %ambiguous_primary_names;
+
+    # Identify the primary name for each place and write all the names into the
+    # database.
+    my $np = 0;
+    foreach my $ufi (keys(%UFI_name)) {
+        print STDERR "Deriving primary names: ", ++$np, "/", scalar(keys(%UFI_name)), "\r";
+        my $nn = $UFI_name{$ufi};
+        my @names = sort { $name_type_preference{$nn->{$a}->[0]} <=> $name_type_preference{$nn->{$b}->[0]} } keys(%$nn);
+        my $primary_name = $names[0];
+
+        my $f = 1;
+        foreach (@names) {
+            my ($nt, $uni) = @{$nn->{$_}};
+            dbh()->do('insert into name (uni, ufi, is_primary, full_name, name_type) values (?, ?, ?, ?, ?)', {}, $uni, $ufi, $f ? 'true' : 'false', $_, $nt);
+            $f = 0;
+        }
+
+        $primary_name_by_UFI{$ufi} = $primary_name;
+        my $s = lc(Gaze::strip_punctuation($primary_name));
+        push(@{$UFI_by_primary_name{$s}}, $ufi);
+        $ambiguous_primary_names{$s} ||= 1
+            if (@{$UFI_by_primary_name{$s}} > 1);
+    }
+    print STDERR "\n";
+
+    my @UFIs_in_lat_order = sort { $data_by_UFI{$a}->{LAT} <=> $data_by_UFI{$b}->{LAT} } keys(%data_by_UFI);
+
+    # find_places_near LAT LON DISTANCE
+    # Return in list context [UFI, distance] of places within DISTANCE km of (LAT,
+    # LON).
+    my $find_places_near = sub ($$$) {
+        my ($lat, $lon, $dist) = @_;
+        my ($lat_l, $lat_h) = ($lat - Gaze::deg($dist / Gaze::R_e), $lat + Gaze::deg($dist / Gaze::R_e));
+        my ($ind_l, $ind_h);    # Bracketing indexes for search in list of UFIs
+
+        # Find low limit of UFIs.
+        my ($l, $h) = (0, $#UFIs_in_lat_order);
+        while ($h > $l + 1) {
+            my $a = int(($h + $l) / 2);
+            my $ufi = $UFIs_in_lat_order[$a];
+            my $ll = $data_by_UFI{$ufi}->{LAT};
+            if ($ll < $lat_l) {
+                $l = $a;
+            } else {
+                $h = $a;
+            }
+        }
+        $ind_l = $l;
+
+        ($l, $h) = (0, $#UFIs_in_lat_order);
+        while ($h > $l + 1) {
+            my $a = int(($h + $l) / 2);
+            my $ufi = $UFIs_in_lat_order[$a];
+            my $ll = $data_by_UFI{$ufi}->{LAT};
+            if ($ll > $lat_h) {
+                $h = $a;
+            } else {
+                $l = $a;
+            }
+        }
+        $ind_h = $h;
+
+        return grep { $_->[1] < $dist } map { [$_, Gaze::distance($lat, $lon, $data_by_UFI{$_}->{LAT}, $data_by_UFI{$_}->{LONG})] } @UFIs_in_lat_order[$ind_l .. $ind_h];
+    };
+
+    # Decide on qualifiers for ambiguous names.
+    my $na = 0;
+    foreach my $primary_name (sort keys %ambiguous_primary_names) {
+        print STDERR "Finding qualifiers for ambiguous names: ", ++$na, "/", scalar(keys(%ambiguous_primary_names)), "\r";
+        my %adm1s;
+        map { ++$adm1s{$data_by_UFI{$_}->{ADM1}} } @{$UFI_by_primary_name{$primary_name}};
+        foreach my $ufi (@{$UFI_by_primary_name{$primary_name}}) {
+            my $place = $data_by_UFI{$ufi};
+
+            # Find distance to places of the same name
+            my $mindist = 1e6;
+            foreach my $ufi2 (@{$UFI_by_primary_name{$primary_name}}) {
+                next if ($ufi == $ufi2);
+                my $d = Gaze::distance($data_by_UFI{$ufi}->{LAT}, $data_by_UFI{$ufi}->{LONG}, $data_by_UFI{$ufi2}->{LAT}, $data_by_UFI{$ufi2}->{LONG});
+                $mindist = $d if ($d < $mindist);
+            }
+
+            # ADM1 code of '00' means "general", so not useful for identifying
+            # places. Therfore, we don't try to disambiguate place names purely by
+            # enclosing administrative region if any of the variants has a '00'
+            # ADM1. But always store the ADM1, even if it's not a disambiguator on
+            # its own.
+            dbh()->do('update feature set in_qualifier = ? where ufi = ?', {}, $ADM1_name{$place->{fips_CC1}}->{$place->{ADM1}}, $ufi)
+                if ($place->{ADM1} ne '00');
+
+            if (!exists($adm1s{'00'}) && $adm1s{$place->{ADM1}} == 1) {
+                # None of the places has a 00 ADM1, and this is the only such place
+                # which is in this administrative division, so we do not need a
+                # 'near' qualifier.
+                next;
+            }
+
+            $mindist = 20 if ($mindist > 20);
+            my @nearby = sort { $a->[1] <=> $b->[1] }
+                            grep {
+                                # Mustn't identify a place as being near another
+                                # ambiguously named place...
+                                !exists($ambiguous_primary_names{lc($primary_name_by_UFI{$_->[0]})})
+                                # or as near itself.
+                                && $_->[0] ne $ufi
+                            } &$find_places_near($place->{LAT}, $place->{LONG}, $mindist / 2);
+            my $n = $#nearby;
+            $n = 2 if ($n > 2);
+            @nearby = @nearby[0 .. $n];
+
+            dbh()->do("update feature set near_qualifier = ? where ufi = ?", {}, join(", ", map { $primary_name_by_UFI{$_->[0]} } @nearby), $ufi);
+        }
+    }
+
+    print STDERR "\n";
 }
 
-my %name_type_exists;
-my %name_types;
-
-# Smaller numbers mean higher preference. These values are used: (a) to select
-# the effective type of a name which is stated under more than one type; (b) to
-# select the preferred "primary" name where names of several types are
-# available.
-my %name_type_preference = (
-        C => 0,         # Conventional
-        N => 1,         # Native
-        V => 2,         # Variant or alternate
-        D => 10         # Not verified
-    );
-
-# Hash which maps UFI to reference to hash of name to name-type and UNI.
-my %UFI_name;
-
+# Read in names
 <STDIN>;    # Skip header
 
 # Each record describes a name and a feature. Each feature may have multiple
-# names.
+# names. 
 my $nf = 0;
-my @data;
+my %data;
 my %countries;
 while (my $line = <STDIN>) {
-    print STDERR "Reading names: ", ++$nf, "\r";
     chomp($line);
     my @fields = split(/\t/, $line);
     my %fields = map { $_ => trim(shift(@fields)) } @fieldnames;
 
     # The only records we grab are those which describe populated places.
     next if ($fields{FC} ne 'P');
+
+    print STDERR "Reading names: ", ++$nf, "\r";
 
     die "don't know ISO country code for '$fields{CC1}'"
         unless (exists($fips_to_iso_country_code{$fields{CC1}}));
@@ -133,185 +308,21 @@ while (my $line = <STDIN>) {
 
     $countries{$fields{CC1}} = 1;
 
-    push @data, \%fields;
+    push @{$data{$fields{CC1}}}, \%fields;
+#    push @data, \%fields;
 }
 print STDERR "\n";
 
 # Delete existing data for the country
-print STDERR "Replacing data for countries: " . join(' ', keys %countries) . "\n";
+print STDERR "Countries in input: " . join(' ', keys %countries) . "\n";
+
 my $countries_clause = join(' ', map {"'".$_."'"} keys %countries);
-dbh()->do("delete from name where ufi in (select ufi from feature where country in ($countries_clause))", {});
-dbh()->do("delete from feature where country in ($countries_clause)", {});
 
-# Insert data into database
-$nf = 0;
-foreach my $fields (@data) {
-    print STDERR "Storing names: ", ++$nf, "\r";
-    my %fields = %$fields;
-
-    # Check that the various names are valid UTF-8. Experiments suggest that
-    # SORT_NAME and FULL_NAME_ND won't be (though I'm not sure how they are
-    # actually coded), but happily we don't need those.
-    foreach (qw(SHORT_FORM GENERIC FULL_NAME)) {
-        if (!utf8::decode($fields{$_})) {
-            die "$_ name \"$fields{$_}\" for UFI $fields{UFI} UNI $fields{UNI} is not valid UTF-8";
-        }
-    }
-
-    my $name = $fields{FULL_NAME};
-    next if ($name =~ m#\(\(.*\)\)#);
-    die if ($name eq '');
-
-    # Change index reading order to normal reading order.
-    if ($name =~ /,/) {
-        print STDERR "$name -> ";
-        $name = join(' ', reverse(split(/,\s*/, $name)));
-        print STDERR "$name\n";
-    }
-    
-    my $ufi = $fields{UFI};
-    my $uni = $fields{UNI};
-    $UFI_name{$ufi} ||= { };
-    my $name_type = $fields{NT};
-
-    if (!exists($data_by_UFI{$ufi})) {
-        $data_by_UFI{$ufi} = \%fields;
-        $fields{PC} = undef if ($fields{PC} eq '');
-        dbh()->do('insert into feature (ufi, country, lat, lon) values (?, ?, ?, ?)', {}, $ufi, map { $fields{$_} } qw(CC1 LAT LONG));
-    }
-
-    if (exists($UFI_name{$ufi}->{$name})) {
-        warn "#$ufi already has name '$name', type $UFI_name{$ufi}->{$name}->[0]\n";
-        $UFI_name{$ufi}->{$name} = [$name_type, $uni]
-            if ($name_type_preference{$name_type} < $name_type_preference{$UFI_name{$ufi}->{$name}->[0]});
-    } else {
-        $UFI_name{$ufi}->{$name} = [$name_type, $uni];
-    }
-
-    $name_type_exists{$name_type} ||= 1;
-    ++$name_types{$name_type}->{$fields{NT}};
-
-    $seen_UFI{$fields{UFI}} = 1;
-}
-print STDERR "\n";
-
-my %UFI_by_primary_name;
-my %primary_name_by_UFI;
-my %ambiguous_primary_names;
-
-# Identify the primary name for each place and write all the names into the
-# database.
-my $np = 0;
-foreach my $ufi (keys(%UFI_name)) {
-    print STDERR "Deriving primary names: ", ++$np, "/", scalar(keys(%UFI_name)), "\r";
-    my $nn = $UFI_name{$ufi};
-    my @names = sort { $name_type_preference{$nn->{$a}->[0]} <=> $name_type_preference{$nn->{$b}->[0]} } keys(%$nn);
-    my $primary_name = $names[0];
-
-    my $f = 1;
-    foreach (@names) {
-        my ($nt, $uni) = @{$nn->{$_}};
-        dbh()->do('insert into name (uni, ufi, is_primary, full_name, name_type) values (?, ?, ?, ?, ?)', {}, $uni, $ufi, $f ? 'true' : 'false', $_, $nt);
-        $f = 0;
-    }
-
-    $primary_name_by_UFI{$ufi} = $primary_name;
-    my $s = lc(Gaze::strip_punctuation($primary_name));
-    push(@{$UFI_by_primary_name{$s}}, $ufi);
-    $ambiguous_primary_names{$s} ||= 1
-        if (@{$UFI_by_primary_name{$s}} > 1);
-}
-print STDERR "\n";
-
-my @UFIs_in_lat_order = sort { $data_by_UFI{$a}->{LAT} <=> $data_by_UFI{$b}->{LAT} } keys(%data_by_UFI);
-
-# find_places_near LAT LON DISTANCE
-# Return in list context [UFI, distance] of places within DISTANCE km of (LAT,
-# LON).
-sub find_places_near ($$$) {
-    my ($lat, $lon, $dist) = @_;
-    my ($lat_l, $lat_h) = ($lat - Gaze::deg($dist / Gaze::R_e), $lat + Gaze::deg($dist / Gaze::R_e));
-    my ($ind_l, $ind_h);    # Bracketing indexes for search in list of UFIs
-
-    # Find low limit of UFIs.
-    my ($l, $h) = (0, $#UFIs_in_lat_order);
-    while ($h > $l + 1) {
-        my $a = int(($h + $l) / 2);
-        my $ufi = $UFIs_in_lat_order[$a];
-        my $ll = $data_by_UFI{$ufi}->{LAT};
-        if ($ll < $lat_l) {
-            $l = $a;
-        } else {
-            $h = $a;
-        }
-    }
-    $ind_l = $l;
-
-    ($l, $h) = (0, $#UFIs_in_lat_order);
-    while ($h > $l + 1) {
-        my $a = int(($h + $l) / 2);
-        my $ufi = $UFIs_in_lat_order[$a];
-        my $ll = $data_by_UFI{$ufi}->{LAT};
-        if ($ll > $lat_h) {
-            $h = $a;
-        } else {
-            $l = $a;
-        }
-    }
-    $ind_h = $h;
-
-    return grep { $_->[1] < $dist } map { [$_, Gaze::distance($lat, $lon, $data_by_UFI{$_}->{LAT}, $data_by_UFI{$_}->{LONG})] } @UFIs_in_lat_order[$ind_l .. $ind_h];
+foreach my $country (keys %countries) {
+    dbh()->do("delete from name where ufi in (select ufi from feature where country = ?)", {}, $country);
+    dbh()->do("delete from feature where country = ?", {}, $country);
+    process_one_country($country, $data{$country});
+    dbh()->commit();
 }
 
-# Decide on qualifiers for ambiguous names.
-my $na = 0;
-foreach my $primary_name (sort keys %ambiguous_primary_names) {
-    print STDERR "Finding qualifiers for ambiguous names: ", ++$na, "/", scalar(keys(%ambiguous_primary_names)), "\r";
-    my %adm1s;
-    map { ++$adm1s{$data_by_UFI{$_}->{ADM1}} } @{$UFI_by_primary_name{$primary_name}};
-    foreach my $ufi (@{$UFI_by_primary_name{$primary_name}}) {
-        my $place = $data_by_UFI{$ufi};
 
-        # Find distance to places of the same name
-        my $mindist = 1e6;
-        foreach my $ufi2 (@{$UFI_by_primary_name{$primary_name}}) {
-            next if ($ufi == $ufi2);
-            my $d = Gaze::distance($data_by_UFI{$ufi}->{LAT}, $data_by_UFI{$ufi}->{LONG}, $data_by_UFI{$ufi2}->{LAT}, $data_by_UFI{$ufi2}->{LONG});
-            $mindist = $d if ($d < $mindist);
-        }
-
-        # ADM1 code of '00' means "general", so not useful for identifying
-        # places. Therfore, we don't try to disambiguate place names purely by
-        # enclosing administrative region if any of the variants has a '00'
-        # ADM1. But always store the ADM1, even if it's not a disambiguator on
-        # its own.
-        dbh()->do('update feature set in_qualifier = ? where ufi = ?', {}, $ADM1_name{$place->{fips_CC1}}->{$place->{ADM1}}, $ufi)
-            if ($place->{ADM1} ne '00');
-
-        if (!exists($adm1s{'00'}) && $adm1s{$place->{ADM1}} == 1) {
-            # None of the places has a 00 ADM1, and this is the only such place
-            # which is in this administrative division, so we do not need a
-            # 'near' qualifier.
-            next;
-        }
-
-        $mindist = 20 if ($mindist > 20);
-        my @nearby = sort { $a->[1] <=> $b->[1] }
-                        grep {
-                            # Mustn't identify a place as being near another
-                            # ambiguously named place...
-                            !exists($ambiguous_primary_names{lc($primary_name_by_UFI{$_->[0]})})
-                            # or as near itself.
-                            && $_->[0] ne $ufi
-                        } find_places_near($place->{LAT}, $place->{LONG}, $mindist / 2);
-        my $n = $#nearby;
-        $n = 2 if ($n > 2);
-        @nearby = @nearby[0 .. $n];
-
-        dbh()->do("update feature set near_qualifier = ? where ufi = ?", {}, join(", ", map { $primary_name_by_UFI{$_->[0]} } @nearby), $ufi);
-    }
-}
-
-print STDERR "\n";
-
-dbh()->commit();
