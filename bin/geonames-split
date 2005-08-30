@@ -1,0 +1,98 @@
+#!/usr/bin/perl -w -I../perllib -I../../../perllib
+#
+# geonames-split:
+# Split GEOnet names file containing many countries into separate files
+# for each country.  Takes data on input pipe, no arguments, writes to files
+# split-XX.txt in current directory.  Appends to any existing files, so clear
+# them first.
+#
+# Get country file here:
+#   http://earth-info.nga.mil/gns/html/geonames_dd_dms_date_20050801.zip
+#
+# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
+# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
+#
+
+my $rcsid = ''; $rcsid .= '$Id: geonames-split,v 1.1 2005-08-30 14:32:06 config-tea Exp $';
+
+use strict;
+require 5.8.0;
+
+# Horrible boilerplate to set up appropriate library paths.
+use FindBin;
+use lib "$FindBin::Bin/../perllib";
+use lib "$FindBin::Bin/../../perllib";
+use lib "$FindBin::Bin/../../../perllib";
+
+use IO::File;
+use POSIX qw(acos);
+use Text::CSV;
+
+use mySociety::Config;
+BEGIN {
+    mySociety::Config::set_file("$FindBin::Bin/../../conf/general");
+}
+use mySociety::DBHandle qw(dbh);
+
+use Gaze;
+
+binmode(STDOUT, ":utf8");
+
+# And mapping from FIPS country codes to ISO ones.
+open(CC, "$FindBin::Bin/../data/fips-10-4-to-iso-country-codes.csv");
+<CC>; # header
+my %fips_to_iso_country_code;
+while (my $line = <CC>) {
+    chomp($line);
+    my ($fips, $iso, $x) = split(/,/, $line);   # XXX should use Text::CSV
+    $fips_to_iso_country_code{$fips} = $iso;
+}
+close(CC);
+
+# Defined in http://earth-info.nga.mil/gns/html/gis.html
+my @fieldnames = qw(
+        RC UFI UNI LAT LONG DMS_LAT DMS_LONG UTM JOG FC DSG PC CC1 ADM1 ADM2
+        DIM CC2 NT LC SHORT_FORM GENERIC SORT_NAME FULL_NAME FULL_NAME_ND
+        MOD_DATE
+    );
+
+sub trim ($) {
+    my $x = shift;
+    $x =~ s/^\s+//;
+    $x =~ s/\s+$//;
+    return $x;
+}
+
+# Read in names
+<STDIN>;    # Skip header
+
+# Each record describes a name and a feature. Each feature may have multiple
+# names. 
+my $nf = 0;
+while (my $line = <STDIN>) {
+    chomp($line);
+    my @fields = split(/\t/, $line);
+    my %fields = map { $_ => trim(shift(@fields)) } @fieldnames;
+
+    # The only records we grab are those which describe populated places.
+    next if ($fields{FC} ne 'P');
+
+    print STDERR "Splitting out names: ", ++$nf, "\r";
+
+    if (!exists($fips_to_iso_country_code{$fields{CC1}})) {
+        # Ignore fips code NM, "No Man's Land", warn for other unknown codes
+        warn "don't know ISO country code for '$fields{CC1}'" if $fields{CC1} ne 'NM';
+        next;
+    }
+
+    $fields{fips_CC1} = $fields{CC1};
+    $fields{CC1} = $fips_to_iso_country_code{$fields{CC1}};
+
+    my $country = $fields{CC1};
+
+    open FH, ">>split-$country.txt" or die "failed to open country file";
+    print FH $line . "\n";
+    close FH
+}
+print STDERR "\n";
+

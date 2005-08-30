@@ -11,12 +11,11 @@
 # Get country files here:
 #   http://earth-info.nga.mil/gns/html/cntry_files.html
 #
-#
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.19 2005-08-30 11:12:40 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.20 2005-08-30 14:32:06 config-tea Exp $';
 
 use strict;
 require 5.8.0;
@@ -79,19 +78,12 @@ my @fieldnames = qw(
 
 sub process_one_country($$) {
     my ($country, $data) = @_;
-    print STDERR "\nCountry $country:\n";
+    print STDERR "Country $country:\n";
 
     my %data_by_UFI;
 
     my %names_by_UFI;
     my %seen_UFI;
-
-    sub trim ($) {
-        my $x = shift;
-        $x =~ s/^\s+//;
-        $x =~ s/\s+$//;
-        return $x;
-    }
 
     my %name_type_exists;
     my %name_types;
@@ -282,6 +274,13 @@ sub process_one_country($$) {
     print STDERR "\n";
 }
 
+sub trim ($) {
+    my $x = shift;
+    $x =~ s/^\s+//;
+    $x =~ s/\s+$//;
+    return $x;
+}
+
 # Read in names
 <STDIN>;    # Skip header
 
@@ -300,8 +299,11 @@ while (my $line = <STDIN>) {
 
     print STDERR "Reading names: ", ++$nf, "\r";
 
-    die "don't know ISO country code for '$fields{CC1}'"
-        unless (exists($fips_to_iso_country_code{$fields{CC1}}));
+    if (!exists($fips_to_iso_country_code{$fields{CC1}})) {
+        # Ignore fips code NM, "No Man's Land", warn for other unknown codes
+        warn "don't know ISO country code for '$fields{CC1}'" if $fields{CC1} ne 'NM';
+        next;
+    }
 
     $fields{fips_CC1} = $fields{CC1};
     $fields{CC1} = $fips_to_iso_country_code{$fields{CC1}};
