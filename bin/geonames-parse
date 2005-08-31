@@ -15,7 +15,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.20 2005-08-30 14:32:06 config-tea Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.21 2005-08-31 17:29:06 config-tea Exp $';
 
 use strict;
 require 5.8.0;
@@ -321,7 +321,7 @@ print STDERR "Countries in input: " . join(' ', keys %countries) . "\n";
 my $countries_clause = join(' ', map {"'".$_."'"} keys %countries);
 
 foreach my $country (keys %countries) {
-    dbh()->do("delete from name where ufi in (select ufi from feature where country = ?)", {}, $country);
+    dbh()->do("delete from name where name.ufi = feature.ufi and feature.country = ?", {}, $country);
     dbh()->do("delete from feature where country = ?", {}, $country);
     process_one_country($country, $data{$country});
     dbh()->commit();
