@@ -15,7 +15,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.22 2005-09-06 19:04:05 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.23 2005-09-06 19:45:52 config-tea Exp $';
 
 use strict;
 require 5.8.0;
@@ -105,7 +105,7 @@ sub process_one_country($$) {
     # Insert data into database
     my $nf = 0;
 
-    foreach my $fields (@$data{$country}) {
+    foreach my $fields (@{$data->{$country}}) {
         print STDERR "Storing names: ", ++$nf, "\r";
         my %fields = %$fields;
 
@@ -156,7 +156,7 @@ sub process_one_country($$) {
     print STDERR "\n";
 
     # save memory
-    delete $data{$country}; 
+    delete $data->{$country}; 
 
     my %UFI_by_primary_name;
     my %primary_name_by_UFI;
@@ -327,7 +327,7 @@ my $countries_clause = join(' ', map {"'".$_."'"} keys %countries);
 foreach my $country (keys %countries) {
     dbh()->do("delete from name where name.ufi = feature.ufi and feature.country = ?", {}, $country);
     dbh()->do("delete from feature where country = ?", {}, $country);
-    process_one_country($country, $data);
+    process_one_country($country, \%data);
     dbh()->commit();
 }
 

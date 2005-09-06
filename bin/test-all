@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Tests Xapian database has been made for all countries
+
+# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
+# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
+
+BINPATH=`dirname $0`
+for FILE in split-??.txt
+do
+    COUNTRY=${FILE:6:2}
+    if [ ! -e "/data/vhost/services.mysociety.org/gaze-xapian/gazeidx-$COUNTRY" ]
+    then
+        echo Country $COUNTRY missing
+    fi
+done
+
+
