@@ -5,8 +5,8 @@
 # This is for countries other than the US, for US see usgs-geonames-parse.
 #
 # Takes data on input pipe, no arguments. The input file must contain all data
-# for any countries within it. Any existing data for those country is removed
-# from Gaze first.
+# for any countries within it. Any existing data for those countries are
+# removed from Gaze first.
 #
 # Get country files here:
 #   http://earth-info.nga.mil/gns/html/cntry_files.html
@@ -15,7 +15,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.24 2005-09-07 08:17:00 config-tea Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.25 2005-09-07 13:09:43 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -76,6 +76,14 @@ my @fieldnames = qw(
         MOD_DATE
     );
 
+# Use a pseudo-/restricted hash for these to save memory
+use fields qw(
+        RC UFI UNI LAT LONG DMS_LAT DMS_LONG UTM JOG FC DSG PC CC1 ADM1 ADM2
+        DIM CC2 NT LC SHORT_FORM GENERIC SORT_NAME FULL_NAME FULL_NAME_ND
+        MOD_DATE fips_CC1
+    );      # why can't we say use fields (@fieldnames, 'fips_CC1') ?
+
+
 sub process_one_country($$) {
     my ($country, $data) = @_;
     print STDERR "Country $country:\n";
@@ -83,7 +91,6 @@ sub process_one_country($$) {
     my %data_by_UFI;
 
     my %names_by_UFI;
-    my %seen_UFI;
 
     my %name_type_exists;
     my %name_types;
@@ -150,8 +157,6 @@ sub process_one_country($$) {
 
         $name_type_exists{$name_type} ||= 1;
         ++$name_types{$name_type}->{$fields{NT}};
-
-        $seen_UFI{$fields{UFI}} = 1;
     }
     print STDERR "\n";
 
@@ -319,10 +324,15 @@ while (my $line = <STDIN>) {
     $fields{fips_CC1} = $fields{CC1};
     $fields{CC1} = $fips_to_iso_country_code{$fields{CC1}};
 
+    # ugh
+    my $f = fields::new('main');
+    foreach (keys %fields) {
+        $f->{$_} = $fields{$_};
+    }
+
     $countries{$fields{CC1}} = 1;
 
-    push @{$data{$fields{CC1}}}, \%fields;
-#    push @data, \%fields;
+    push(@{$data{$fields{CC1}}}, $f);
 }
 print STDERR "\n";
 
