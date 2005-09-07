@@ -15,7 +15,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.23 2005-09-06 19:45:52 config-tea Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.24 2005-09-07 08:17:00 config-tea Exp $';
 
 use strict;
 require 5.8.0;
@@ -307,6 +307,13 @@ while (my $line = <STDIN>) {
         # Ignore fips code NM, "No Man's Land", warn for other unknown codes
         warn "don't know ISO country code for '$fields{CC1}'" if $fields{CC1} ne 'NM';
         next;
+    }
+
+    if ($fields{NT} =~ m/^\s*$/) {
+        warn "Name type blank, assuming 'C'. Line:\n$line";
+        $fields{NT} = 'C';
+    } elsif ($fields{NT} !~ m/^[CDNV]$/) {
+        die "Name type $fields{NT} not known. Line:\n$line";
     }
 
     $fields{fips_CC1} = $fields{CC1};
