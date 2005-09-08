@@ -6,13 +6,14 @@
 # usage:
 # ./xapian-index COUNTRY
 # COUNTRY - two letter country code
-# Location of database is read from GAZE_XAPIAN_INDEX_DIR in services/conf/general
+# Location of database is read from GAZE_XAPIAN_INDEX_DIR in
+# services/conf/general
 #
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.5 2005-08-03 15:39:16 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.6 2005-09-08 11:38:55 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -43,22 +44,22 @@ die "Expected two capital letters for country code" if $country !~ m/^[A-Z][A-Z]
 my $db_final_name = mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . '/gazeidx-' . $country;
 my $db_temp_name = $db_final_name . '-new';
 
-print STDERR "Counting names... ";
-my $N = dbh()->selectrow_array('select count(name.uni) from name, feature where name.ufi = feature.ufi and feature.country = ?', {}, $country);
-print STDERR "$N total\n";
-die "None found for country '$country'" if $N < 1;
-
-# Create with temporary name
-if (-d $db_temp_name) { rmtree($db_temp_name) or die "couldn't remove '$db_temp_name'"; }
-my $X = new Search::Xapian::WritableDatabase($db_temp_name, Search::Xapian::DB_CREATE);
-
 print STDERR "Retrieving names... ";
 my $q = dbh()->prepare('select name.uni, full_name from name, feature where name.ufi = feature.ufi and feature.country = ?');
 $q->execute($country);
+my $N = $q->rows();
 print STDERR "done\n";
+
+die "no names for $country" if ($N < 1);
+
+# Create index database with temporary name
+if (-d $db_temp_name) { rmtree($db_temp_name) or die "couldn't remove '$db_temp_name'"; }
+my $X = new Search::Xapian::WritableDatabase($db_temp_name, Search::Xapian::DB_CREATE);
+
 my $nn = 0;
 while (my ($uni, $name) = $q->fetchrow_array()) {
-    print STDERR "Indexing names: ", ++$nn, "/", $N, "\r";
+    print STDERR "\rIndexing names: $nn/$N" if (($nn % 100) == 0);
+    ++$nn;
     my $h = Gaze::split_name_parts($name);
     my $d = new Search::Xapian::Document();
 
@@ -70,7 +71,7 @@ while (my ($uni, $name) = $q->fetchrow_array()) {
     # Assume that we have not indexed it before.
     $X->add_document($d);
 }
-print "\n";
+print STDERR "\rIndexing names: $nn/$N\n";
 
 # Hopefully call destructor, and commit of Xapian database
 undef $X;
