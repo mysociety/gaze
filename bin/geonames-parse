@@ -15,7 +15,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.25 2005-09-07 13:09:43 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.26 2005-09-08 11:50:28 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -113,7 +113,8 @@ sub process_one_country($$) {
     my $nf = 0;
 
     foreach my $fields (@{$data->{$country}}) {
-        print STDERR "Storing names: ", ++$nf, "\r";
+        ++$nf;
+        print STDERR "Storing names: $nf\r" if (($nf % 100) == 0);
         my %fields = %$fields;
 
         # Check that the various names are valid UTF-8. Experiments suggest that
@@ -158,7 +159,7 @@ sub process_one_country($$) {
         $name_type_exists{$name_type} ||= 1;
         ++$name_types{$name_type}->{$fields{NT}};
     }
-    print STDERR "\n";
+    print STDERR "Storing names: $nf\n";
 
     # save memory
     delete $data->{$country}; 
@@ -249,10 +250,10 @@ sub process_one_country($$) {
             }
 
             # ADM1 code of '00' means "general", so not useful for identifying
-            # places. Therfore, we don't try to disambiguate place names purely by
-            # enclosing administrative region if any of the variants has a '00'
-            # ADM1. But always store the ADM1, even if it's not a disambiguator on
-            # its own.
+            # places. Therfore, we don't try to disambiguate place names purely
+            # by enclosing administrative region if any of the variants has a
+            # '00' ADM1. But always store the ADM1, even if it's not a
+            # disambiguator on its own.
             dbh()->do('update feature set in_qualifier = ? where ufi = ?', {}, $ADM1_name{$place->{fips_CC1}}->{$place->{ADM1}}, $ufi)
                 if ($place->{ADM1} ne '00');
 
@@ -306,7 +307,8 @@ while (my $line = <STDIN>) {
     # The only records we grab are those which describe populated places.
     next if ($fields{FC} ne 'P');
 
-    print STDERR "Reading names: ", ++$nf, "\r";
+    ++$nf;
+    print STDERR "\rReading names: $nf" if (($nf % 100) == 0);
 
     if (!exists($fips_to_iso_country_code{$fields{CC1}})) {
         # Ignore fips code NM, "No Man's Land", warn for other unknown codes
@@ -334,7 +336,7 @@ while (my $line = <STDIN>) {
 
     push(@{$data{$fields{CC1}}}, $f);
 }
-print STDERR "\n";
+print STDERR "\rReading names: $nf\n";
 
 # Delete existing data for the country
 print STDERR "Countries in input: " . join(' ', keys %countries) . "\n";
@@ -342,8 +344,10 @@ print STDERR "Countries in input: " . join(' ', keys %countries) . "\n";
 my $countries_clause = join(' ', map {"'".$_."'"} keys %countries);
 
 foreach my $country (keys %countries) {
+    print STDERR "Deleting any existing data for $country... ";
     dbh()->do("delete from name where name.ufi = feature.ufi and feature.country = ?", {}, $country);
     dbh()->do("delete from feature where country = ?", {}, $country);
+    print STDERR "done\n";
     process_one_country($country, \%data);
     dbh()->commit();
 }
