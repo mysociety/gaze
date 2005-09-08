@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.10 2005-08-11 08:57:00 francis Exp $
+# $Id: Gaze.pm,v 1.11 2005-09-08 11:30:55 chris Exp $
 #
 
 package Gaze;
@@ -198,7 +198,7 @@ found.
 =cut
 sub get_country_from_ip ($) {
     my ($addr) = @_;
-    return undef if $addr eq '127.0.0.1';
+    return undef if ($addr =~ /^127\./);
     our $geoip;
     $geoip ||= new Geo::IP(GEOIP_STANDARD);
     my $country = $geoip->country_code_by_addr($addr);
