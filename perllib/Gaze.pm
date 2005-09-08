@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.11 2005-09-08 11:30:55 chris Exp $
+# $Id: Gaze.pm,v 1.12 2005-09-08 11:34:20 francis Exp $
 #
 
 package Gaze;
@@ -97,18 +97,20 @@ STATE, if specified, is a customary code for a top-level administrative
 subregion within the given COUNTRY; at present, this is only useful for the
 United States, and should be passed as undef otherwise.  
 
-Returns a reference to a list of [NAME, IN, NEAR, LATITUDE, LONGITUDE, STATE].
+Returns a reference to a list of [NAME, IN, NEAR, LATITUDE, LONGITUDE, STATE, SCORE].
 When IN is defined, it gives the name of a region in which the place lies; when
 NEAR is defined, it gives a short list of other places near to the returned
 place.  These allow nonunique names to be disambiguated by the user.  LATITUDE
 and LONGITUDE are in decimal degrees, north- and east-positive, in WGS84.
 Earlier entries in the returned list are better matches to the query. At most
-MAXRESULTS (default, 10) results are returned. On error, throws an exception.
+MAXRESULTS (default, 20) results, and only results with score at least MINSCORE
+(default 0, percentage from 0 to 100) are returned. On error, throws an exception.
 
 =cut
-sub find_places ($$$;$) {
-    my ($country, $state, $query, $maxresults) = @_;
+sub find_places ($$$;$$) {
+    my ($country, $state, $query, $maxresults, $minscore) = @_;
     $maxresults ||= 10;
+    $minscore ||= 0;
     throw RABX::Error("Country code must be exactly two capital letters") unless ($country =~ m/^[A-Z][A-Z]$/);
 
     # Xapian databases for different countries.
@@ -134,10 +136,13 @@ sub find_places ($$$;$) {
     my $terms = Gaze::split_name_parts($query);
     my $enq = $X->enquire(OP_OR, keys(%$terms));
 
-    while (keys(%score) < $maxresults) {
+    # grab more than maxresults from xapian, so we can show all those with
+    # same highest score (e.g. there are about 30 Cambridges)
+    my $xapian_maxresults = $maxresults + 100; 
+    while (keys(%score) < $xapian_maxresults) {
         if (!defined($match_start)) {
             $match_start = 0;
-            $match_num = $maxresults;
+            $match_num = $xapian_maxresults;
         } else {
             $match_start += $match_num;
             $match_num += int($match_num / 2);
@@ -164,9 +169,17 @@ sub find_places ($$$;$) {
     }
 
     my @results;
+    my $first_score;
     foreach my $ufi (sort { $score{$b} <=> $score{$a} || $isprimary{$b} <=> $isprimary{$a} } keys(%score)) {
-        push(@results, [dbh()->selectrow_array('select full_name, in_qualifier, near_qualifier, lat, lon, state from feature, name where feature.ufi = name.ufi and feature.ufi = ? and is_primary', {}, $ufi)]);
-        last if (@results == $maxresults);
+        # Stop when we 
+        # - exceed max results AND
+        # - we have shown all the entries with the highest score (this makes
+        #   sure all towns with same name get shown)
+        last if ($first_score && $score{$ufi} < $first_score && @results >= $maxresults);
+        push(@results, [dbh()->selectrow_array('select full_name, in_qualifier, near_qualifier, lat, lon, state, ? from feature, name where feature.ufi = name.ufi and feature.ufi = ? and is_primary', {}, $score{$ufi}, $ufi)]);
+        $first_score = $score{$ufi} if !$first_score;
+        warn "first score is $first_score\n";
+        last if ($score{$ufi} < $minscore);
     }
     return \@results;
 }

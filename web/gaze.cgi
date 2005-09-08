@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.5 2005-08-09 15:55:41 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.6 2005-09-08 11:34:20 francis Exp $';
 
 use strict;
 
@@ -36,7 +36,7 @@ my $W = new mySociety::WatchUpdate();
 while ($req->Accept() >= 0) {
     RABX::Server::CGI::dispatch(
             'Gaze.find_places' => sub {
-                Gaze::find_places($_[0], $_[1], $_[2], $_[3]);
+                Gaze::find_places($_[0], $_[1], $_[2], $_[3], $_[4]);
             },
             'Gaze.get_country_from_ip' => sub {
                 Gaze::get_country_from_ip($_[0]);
