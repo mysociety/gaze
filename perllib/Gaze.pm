@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.12 2005-09-08 11:34:20 francis Exp $
+# $Id: Gaze.pm,v 1.13 2005-09-08 12:02:44 francis Exp $
 #
 
 package Gaze;
@@ -178,7 +178,6 @@ sub find_places ($$$;$$) {
         last if ($first_score && $score{$ufi} < $first_score && @results >= $maxresults);
         push(@results, [dbh()->selectrow_array('select full_name, in_qualifier, near_qualifier, lat, lon, state, ? from feature, name where feature.ufi = name.ufi and feature.ufi = ? and is_primary', {}, $score{$ufi}, $ufi)]);
         $first_score = $score{$ufi} if !$first_score;
-        warn "first score is $first_score\n";
         last if ($score{$ufi} < $minscore);
     }
     return \@results;
