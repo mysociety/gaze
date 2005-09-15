@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.15 2005-09-15 13:20:34 francis Exp $
+# $Id: Gaze.pm,v 1.16 2005-09-15 13:23:08 francis Exp $
 #
 
 package Gaze;
@@ -112,6 +112,7 @@ with MAXRESULTS of 5, it will return all the Cambridges, even though there
 are more than 5 of them.
 
 On error, throws an exception.
+
 =cut
 sub find_places ($$$;$$) {
     my ($country, $state, $query, $maxresults, $minscore) = @_;
