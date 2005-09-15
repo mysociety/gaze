@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -w -I../perllib -I../../../perllib
 #
 # gaze-rest.cgi:
 # "RESTful" interface to Gaze.
@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.1 2005-09-15 14:01:32 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.2 2005-09-15 14:20:46 chris Exp $';
 
 use strict;
 
@@ -29,17 +29,21 @@ use Gaze;
 my $W = new mySociety::WatchUpdate();
 
 # XXX do this in Gaze.pm?
-my %countries = map { $_ => 1 } get_find_places_countries();
+my %countries = map { $_ => 1 } Gaze::get_find_places_countries();
 my $countries_last = time();
 
 my %dispatch = (
         get_country_from_ip => {
-                ip => sub ($) {
-                    return "missing (should specify a single IPv4 address in dotted-quad notation)"
-                        if (!defined($_[0]));
-                    return "invalid (should specify a single IPv4 address in dotted-quad notation)"
-                        if ($_[0] !=~ /^$RE{net}{IPv4}$/);
-                }
+                ip => [
+                    "IP address for which to return country",
+                    sub ($) {
+                        return "missing (should specify a single IPv4 address in dotted-quad notation)"
+                            if (!defined($_[0]));
+                        return "invalid (should specify a single IPv4 address in dotted-quad notation)"
+                            unless ($_[0] =~ /^$RE{net}{IPv4}$/);
+                        return undef;
+                    }
+                ]
             },
         get_find_places_countries => {
             },
@@ -62,13 +66,30 @@ my %dispatch = (
                     "query term, at least two UTF-8 characters",
                     sub ($) {
                         my $x = $_[0];
-                        return "invalid (not UTF-8)"
+                        return "not valid UTF-8"
                             if (!utf8::decode($x));
-                        return "invalid (too short)"
+                        return "too short"
                             unless (length($x) >= 2);
-                    },
-                maxresults => qr/^(100|[1-9]\d|[1-9])*$/,
-                minscore => qr/^(100|[1-9]\d|[1-9])*$/
+                        return undef;
+                    }
+                ],
+                maxresults => [
+                    "largest number of results to return (optional; between 1 and 100 inclusive)",
+                    sub ($) {
+                        return undef if (!defined($_[0]));
+                        return "invalid"
+                            unless ($_[0] =~ /^(100|[1-9]\d|[1-9])*$/);
+                        return undef;
+                    }
+                ], minscore => [
+                    "smallest percentage score for returned results (optional; between 1 and 100 inclusive)",
+                    sub ($) {
+                        return undef if (!defined($_[0]));
+                        return "invalid"
+                            unless ($_[0] =~ /^(100|[1-9]\d|[1-9])*$/);
+                        return undef;
+                    }
+                ]
             }
     );
 
@@ -91,28 +112,29 @@ while (my $q = new CGI::Fast()) {
         my %v = ( );
         my %errors = ( );
         foreach my $p (keys %{$dispatch{$f}}) {
-            my $test = $dispatch{$f}->{$p};
-            my $v{$p} = $q->param($p);
+            my ($desc, $test) = @{$dispatch{$f}->{$p}};
+            $v{$p} = $q->param($p);
             if (ref($test) eq 'Regexp') {
                 if (!defined($v{$p})) {
-                    $errors{$v{$p}} = 'missing';
-                } elsif ($v !~ $test) {
-                    $errors{$v{$p}} = 'invalid';
+                    $errors{$p} = "missing; should be $desc";
+                } elsif ($v{$p} !~ $test) {
+                    $errors{$p} = "invalid; should be $desc";
                 }
             } else {
                 my $r = &$test($v{$p});
-                $errors{$p} = $r if (defined($r));
+                $errors{$p} = "$r; should be $desc" if (defined($r));
             }
         }
 
         my $ct = 'text/plain; charset=utf-8';
         my $r;
         if (keys(%errors)) {
-            error(%errors);
+            error($q, %errors);
         } elsif ($f eq 'get_country_from_ip') {
-            my $r = Gaze::get_country_from_ip($v{$p});
+            $r = Gaze::get_country_from_ip($v{ip});
             $r ||= '';
             $r .= "\n";
+            warn "$r\n";
         } elsif ($f eq 'get_find_places_countries') {
             if ($countries_last < time() - 60) {
                 my %countries = map { $_ => 1 } get_find_places_countries();
