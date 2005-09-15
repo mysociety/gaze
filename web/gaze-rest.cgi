@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.2 2005-09-15 14:20:46 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.3 2005-09-15 14:28:38 chris Exp $';
 
 use strict;
 
@@ -20,7 +20,9 @@ BEGIN {
 }
 
 use CGI::Fast;
+use Error qw(:try);
 use mySociety::WatchUpdate;
+use RABX; # only for RABX::Error
 use Regexp::Common qw(net);
 use utf8;
 
@@ -29,17 +31,17 @@ use Gaze;
 my $W = new mySociety::WatchUpdate();
 
 # XXX do this in Gaze.pm?
-my %countries = map { $_ => 1 } Gaze::get_find_places_countries();
+my %countries = map { $_ => 1 } @{Gaze::get_find_places_countries()};
 my $countries_last = time();
 
 my %dispatch = (
         get_country_from_ip => {
                 ip => [
-                    "IP address for which to return country",
+                    "IP address for which to return country, in dotted-quad notation",
                     sub ($) {
-                        return "missing (should specify a single IPv4 address in dotted-quad notation)"
+                        return "missing"
                             if (!defined($_[0]));
-                        return "invalid (should specify a single IPv4 address in dotted-quad notation)"
+                        return "invalid"
                             unless ($_[0] =~ /^$RE{net}{IPv4}$/);
                         return undef;
                     }
@@ -55,12 +57,14 @@ my %dispatch = (
                             if (!defined($_[0]));
                         return "invalid"
                             if ($_[0] !~ /^[A-Z]{2}$/ || !exists($countries{$_[0]}));
+                        return undef;
                     }
                 ], state => [
                     "state in which to search for places (optional)",
                     sub ($) {
                         return undef if (!defined($_[0]));
                         return "invalid" if ($_[0] !~ /^[A-Z]{2}$/);
+                        return undef;
                     }
                 ], query => [
                     "query term, at least two UTF-8 characters",
@@ -148,7 +152,7 @@ while (my $q = new CGI::Fast()) {
             } catch RABX::Error with {
                 my $E = shift;
                 $r = undef;
-                error($q, find_places => $E->text);
+                error($q, find_places => $E->text());
             };
             if ($l) {
                 # CSV formatted per http://www.ietf.org/internet-drafts/draft-shafranovich-mime-csv-05.txt
