@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.14 2005-09-08 16:47:30 francis Exp $
+# $Id: Gaze.pm,v 1.15 2005-09-15 13:20:34 francis Exp $
 #
 
 package Gaze;
@@ -89,7 +89,7 @@ sub split_name_parts ($) {
     return \%parts;
 }
 
-=item find_places COUNTRY STATE QUERY [MAXRESULTS]
+=item find_places COUNTRY STATE QUERY [MAXRESULTS [MINSCORE]]
 
 Search for places in COUNTRY (ISO code) which match the given search QUERY.
 The country must be from the list returned by get_find_places_countries.
@@ -102,10 +102,16 @@ When IN is defined, it gives the name of a region in which the place lies; when
 NEAR is defined, it gives a short list of other places near to the returned
 place.  These allow nonunique names to be disambiguated by the user.  LATITUDE
 and LONGITUDE are in decimal degrees, north- and east-positive, in WGS84.
-Earlier entries in the returned list are better matches to the query. At most
-MAXRESULTS (default, 20) results, and only results with score at least MINSCORE
-(default 0, percentage from 0 to 100) are returned. On error, throws an exception.
+Earlier entries in the returned list are better matches to the query. 
 
+At most MAXRESULTS (default, 20) results, and only results with score at least
+MINSCORE (default 0, percentage from 0 to 100) are returned. The MAXRESULTS
+limit is ignored when the top results all have the same relevancy. They are all
+returned. So for example, this means that if you search for Cambridge in the US
+with MAXRESULTS of 5, it will return all the Cambridges, even though there
+are more than 5 of them.
+
+On error, throws an exception.
 =cut
 sub find_places ($$$;$$) {
     my ($country, $state, $query, $maxresults, $minscore) = @_;
