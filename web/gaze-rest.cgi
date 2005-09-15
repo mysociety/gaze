@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.4 2005-09-15 14:34:19 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.5 2005-09-15 15:14:55 chris Exp $';
 
 use strict;
 
@@ -102,7 +102,8 @@ sub error ($%) {
     my $text = join("", map { "$_: $e{$_}\n" } sort(keys(%e)));
     print $q->header(
                 -content_type => 'text/plain; charset=utf-8',
-                -content_length => length($text)
+                -content_length => length($text),
+                -status => '400 Bad Request'
             ), $text;
 }
     
