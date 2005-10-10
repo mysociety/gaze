@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.16 2005-09-15 13:23:08 francis Exp $
+# $Id: Gaze.pm,v 1.17 2005-10-10 21:19:20 chris Exp $
 #
 
 package Gaze;
@@ -221,6 +221,11 @@ sub get_country_from_ip ($) {
     our $geoip;
     $geoip ||= new Geo::IP(GEOIP_STANDARD);
     my $country = $geoip->country_code_by_addr($addr);
+    # GeoIP may also return "continent codes", in the case of addresses for
+    # which a proper country code is not available. These are of almost no
+    # value to us, so suppress them.
+    my %continent = map { $_ => 1 } qw(AF AN AS EU NA OC SA);
+    $country = undef if (exists($continent{$country}));
     return $country;
 }
 
