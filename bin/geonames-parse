@@ -15,7 +15,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.26 2005-09-08 11:50:28 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.27 2005-11-24 14:48:00 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -229,7 +229,7 @@ sub process_one_country($$) {
         }
         $ind_h = $h;
 
-        return grep { $_->[1] < $dist } map { [$_, Gaze::distance($lat, $lon, $data_by_UFI{$_}->{LAT}, $data_by_UFI{$_}->{LONG})] } @UFIs_in_lat_order[$ind_l .. $ind_h];
+        return grep { $_->[1] < $dist } map { [$_, Geo::Distance::distance($lat, $lon, $data_by_UFI{$_}->{LAT}, $data_by_UFI{$_}->{LONG})] } @UFIs_in_lat_order[$ind_l .. $ind_h];
     };
 
     # Decide on qualifiers for ambiguous names.
@@ -245,7 +245,7 @@ sub process_one_country($$) {
             my $mindist = 1e6;
             foreach my $ufi2 (@{$UFI_by_primary_name{$primary_name}}) {
                 next if ($ufi == $ufi2);
-                my $d = Gaze::distance($data_by_UFI{$ufi}->{LAT}, $data_by_UFI{$ufi}->{LONG}, $data_by_UFI{$ufi2}->{LAT}, $data_by_UFI{$ufi2}->{LONG});
+                my $d = Geo::Distance::distance($data_by_UFI{$ufi}->{LAT}, $data_by_UFI{$ufi}->{LONG}, $data_by_UFI{$ufi2}->{LAT}, $data_by_UFI{$ufi2}->{LONG});
                 $mindist = $d if ($d < $mindist);
             }
 

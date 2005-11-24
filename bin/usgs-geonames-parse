@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.6 2005-08-08 16:32:45 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.7 2005-11-24 14:48:00 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -22,6 +22,7 @@ use lib "$FindBin::Bin/../perllib";
 use lib "$FindBin::Bin/../../perllib";
 use lib "$FindBin::Bin/../../../perllib";
 
+use Geo::Distance;
 use IO::File;
 use POSIX qw(acos);
 use Text::CSV;
@@ -163,7 +164,7 @@ sub find_places_near ($$$) {
 
     return grep { !exists($deleted{$_->[0]}) }
             grep { $_->[1] < $dist }
-            map { [$_, Gaze::distance($lat, $lon, $place{$_}->[3], $place{$_}->[4])] }
+            map { [$_, Geo::Distance::distance($lat, $lon, $place{$_}->[3], $place{$_}->[4])] }
                 @features_in_lat_order[$ind_l .. $ind_h];
 }
 
@@ -182,7 +183,7 @@ foreach my $id (sort { $place{$a}->[0] cmp $place{$b}->[0] } keys(%ambiguous_id)
                     # sort in order of distance from this place
     my @others = sort { $a->[1] <=> $b->[1] }
                     # compute distances
-                    map { [$_, Gaze::distance($lat, $lon, $place{$_}->[3], $place{$_}->[4]) ] }
+                    map { [$_, Geo::Distance::distance($lat, $lon, $place{$_}->[3], $place{$_}->[4]) ] }
                     # find places with the same name in this county
                     grep { $_ != $id
                             && !exists($deleted{$id})

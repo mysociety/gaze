@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.18 2005-10-15 00:13:55 francis Exp $
+# $Id: Gaze.pm,v 1.19 2005-11-24 14:48:00 chris Exp $
 #
 
 package Gaze;
@@ -239,30 +239,6 @@ sub strip_punctuation ($) {
     my $t = shift;
     $t =~ s#[^[:alpha:][0-9]]##g; # [0-9] because US place names quite commonly contain numbers
     return $t;
-}
-
-use constant R_e => 6372.8; # radius of the earth in km
-use constant M_PI => 3.141592654;
-
-# rad DEGREES
-# Return DEGREES in radians.
-sub rad ($) {
-    return M_PI * $_[0] / 180.;
-}
-
-# deg RADIANS
-# Return RADIANS in degrees.
-sub deg ($) {
-    return 180. * $_[0] / M_PI;
-}
-
-# distance LAT1 LON2 LAT2 LON2
-# Return the great-circle distance between (LAT1, LON1) and (LAT2, LON2).
-sub distance ($$$$) {
-    my ($lat1, $lon1, $lat2, $lon2) = map { rad($_) } @_;
-    my $arg = sin($lat1) * sin($lat2) + cos($lat1) * cos($lat2) * cos($lon1 - $lon2);
-    return 0 if (abs($arg) > 1); # XXX "shouldn't happen", but sometimes does when passed two equal places
-    return R_e * acos(sin($lat1) * sin($lat2) + cos($lat1) * cos($lat2) * cos($lon1 - $lon2));
 }
 
 1;
