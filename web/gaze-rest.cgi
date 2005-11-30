@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.6 2005-09-16 10:20:23 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.7 2005-11-30 15:02:59 chris Exp $';
 
 use strict;
 
@@ -94,7 +94,74 @@ my %dispatch = (
                         return undef;
                     }
                 ]
-            }
+            },
+            get_population_density => {
+                lat => [
+                    "WGS84 latitude, in north-positive decimal degrees",
+                    sub ($) {
+                        my $lat = shift;
+                        my $w = undef;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $lat += 0.; };
+                        return "'$lat' is not a valid real number" if ($w);
+                        return "'$lat' is out-of-range (should be in [-90, 90])"
+                            if ($lat < -90 || $lat > 90);
+                        return undef;
+                    }
+                ], lon => [
+                    "WGS84 longitude, in east-positive decimal degrees",
+                    sub ($) {
+                        my $lon = shift;
+                        my $w = undef;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $lon += 0.; };
+                        return "'$lon' is not a valid real number" if ($w);
+                        return undef;
+                    }
+                ]
+            },
+            get_radius_containing_population => {
+                lat => [
+                    "WGS84 latitude, in north-positive decimal degrees",
+                    sub ($) {
+                        my $lat = shift;
+                        my $w = undef;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $lat += 0.; };
+                        return "'$lat' is not a valid real number" if ($w);
+                        return "'$lat' is out-of-range (should be in [-90, 90])"
+                            if ($lat < -90 || $lat > 90);
+                        return undef;
+                    }
+                ], lon => [
+                    "WGS84 longitude, in east-positive decimal degrees",
+                    sub ($) {
+                        my $lon = shift;
+                        my $w = undef;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $lon += 0.; };
+                        return "'$lon' is not a valid real number" if ($w);
+                        return undef;
+                    }
+                ], number => [
+                    "number of persons",
+                    sub ($) {
+                        my $num = shift;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $num += 0.; };
+                        return "'$num' is not a valid real number" if ($w);
+                        return "'$num' must not be negative" if ($num < 0);
+                        return undef;
+                    }
+                ], maximum => [
+                    "maximum radius to return (default 150km)",
+                    sub ($) {
+                        my $max = shift;
+                        return undef if (!defined($max));
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $max += 0.; };
+                        return "'$max' is not a valid real number" if ($w);
+                        return "'$max' must not be negative" if ($max < 0);
+                        return "'$max' is greater than the circumference of the earth" if ($max > 41000);
+                        return undef;
+                    }
+                ]
+            },
+           
     );
 
 sub error ($%) {
@@ -163,6 +230,24 @@ while (my $q = new CGI::Fast()) {
                     $r .= join(",", map { my $x = $_; $x =~ s/"/""/g; qq("$x") } @$_) . "\r\n";
                 }
             }
+        } elsif ($f eq 'get_population_density') {
+            try {
+                $r = get_population_density($v{lat}, $v{lon});
+            } catch RABX::Error with {
+                my $E = shift;
+                $r = undef;
+                error($q, get_population_density => $E->text());
+            };
+            $r .= "\n";
+        } elsif ($f eq 'get_radius_containing_population') {
+            try {
+                $r = get_radius_containing_population($v{lat}, $v{lon}, $v{number}, $v{maximum});
+            } catch RABX::Error with {
+                my $E = shift;
+                $r = undef;
+                error($q, get_population_density => $E->text());
+            };
+            $r .= "\n";
         }
         if ($r) {
             print $q->header(
