@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.19 2005-11-24 14:48:00 chris Exp $
+# $Id: Gaze.pm,v 1.20 2005-11-30 14:39:51 chris Exp $
 #
 
 package Gaze;
@@ -239,6 +239,263 @@ sub strip_punctuation ($) {
     my $t = shift;
     $t =~ s#[^[:alpha:][0-9]]##g; # [0-9] because US place names quite commonly contain numbers
     return $t;
+}
+
+#
+# Gridded Population of the World stuff
+#
+
+package Gaze::GPW;
+
+use Geo::HelmertTransform;
+use IO::File;
+
+my $datum = Geo::HelmertTransform::datum('WGS84');
+
+my $f;
+my $filename;
+my $datastart;
+my ($west, $east, $south, $north, $xpitch, $ypitch, $cols, $rows);
+my $blurb_string = <<EOF;
+Gaze population density file -- DO NOT EDIT
+EOF
+
+# read_gpw_header
+#
+sub read_gpw_data () {
+    return if ($f);
+    $filename = mySociety::Config::get('GAZE_GPW_DATA');
+    $f = new IO::File($filename, O_RDONLY) 
+                || die "$filename: open: $!";
+    # Grab data about the grid.
+    my $len = length(pack('ddddddII', qw(0 0 0 0 0 0 0 0)));
+    $f->seek(length($blurb_string), SEEK_SET)
+                || die "$filename: lseek: $!";
+    my $header = '';
+    $f->read($header, $len)
+                || die "$filename: read: $!";
+    ($west, $east, $south, $north, $xpitch, $ypitch, $cols, $rows)
+        = unpack('ddddddII', $header);
+#print join(", ", unpack('ddddddII', $header)), "\n";;
+    $datastart = $f->getpos();
+}
+
+use constant M_PI => 3.141592654;
+
+# get_cell_number LAT LON
+# Return the cell number in which (LAT, LON) lies. Returns -1 if the cell is
+# outside the coverage area; dies on error. 
+sub get_cell_number ($$) {
+    my ($lat, $lon) = @_;
+    read_gpw_data();
+
+    throw RABX::Error("Latitude is out of range") if ($lat > 90 || $lat < -90);
+    
+    # 
+    # GPW is cell-based: each element in the grid specifies the population in
+    # a cell lying between lines of fixed longitude and latitude:
+    #
+    #            m dx          (m + 1) dx
+    #       n dy + - - - - - - +
+    #              population
+    #            | density in  |
+    #              cell is
+    #            | recorded at |
+    #              (m, n)
+    # (n + 1) dy + - - - - - - +
+    # 
+
+    $lon -= 180 while ($lon > 180);
+    $lon += 180 while ($lon < -180);
+   
+#printf "using (%f, %f)\n", $lat, $lon;
+   
+    my $x = int(($lon - $west) / $xpitch);
+    my $y = int(($north - $lat) / $ypitch);
+
+#printf "(x, y) = (%d, %d)\n", $x, $y;
+
+    return -1 if ($y < 0 || $y >= $rows);
+    die "bad X value" if ($x < 0 || $x >= $cols); # shouldn't happen
+
+#printf "($lat, $lon) -> cell #%d\n", $y * $cols + $x;
+
+    return $y * $cols + $x;
+}
+
+# get_density NUMBER | LAT LON
+# Return the population density (in persons per square kilometer) at cell
+# NUMBER or at (LAT, LON).
+my $cellsize = length(pack('d', 0));
+sub get_density ($;$) {
+    my $n = $_[0];
+    $n = get_cell_number($_[0], $_[1]) if (@_ == 2);
+    return 0. if ($n == -1);
+    $f->setpos($datastart) || die "$filename: setpos: $!";
+    $f->seek($n * length(pack('d', 0)), 1) || die "$filename: lseek: $!";
+    my $b = '';
+    $f->read($b, $cellsize) || die "$filename: read: $!";
+    my $density = unpack('d', $b);
+#print "\$density = $density\n";
+    $density = 0 if ($density < 0);
+    return $density;
+}
+
+# utilities for 3-vectors
+sub len3 ($) {
+    my $v = shift;
+    return sqrt($v->[0] ** 2 + $v->[1] ** 2 + $v->[2] ** 2);
+}
+
+sub add3 ($$) {
+    my ($a, $b) = @_;
+    return [map { $a->[$_] + $b->[$_] } (0 .. 2)];
+}
+
+sub sub3 ($$) {
+    my ($a, $b) = @_;
+    return [map { $a->[$_] - $b->[$_] } (0 .. 2)];
+}
+
+sub mul3 ($$) {
+    my ($s, $v) = @_;
+    return [map { $_ * $s } @$v];
+}
+
+sub normalise3 ($) {
+    return mul3(1 / len3($_[0]), $_[0]);
+}
+
+sub dot3 ($$) {
+    my ($a, $b) = @_;
+    my $d = 0;
+    map { $a->[$_] * $b->[$_] } (0 .. 2);
+    return $d;
+}
+
+# spherical_cap_area R1 R2
+# Return the surface area of a spherical cap on a sphere radius R1 subtending
+# and angle 2 R2 / R1 (i.e., a cap which on the surface of the sphere appears
+# to be of radius R2).
+sub spherical_cap_area ($$) {
+    my ($R, $r) = @_;
+    my $theta = $r / $R;
+    # assuming the thing is flat is a pretty good approximation for small r.
+    return M_PI * $r ** 2 if ($theta < 0.25);
+    my $a = sin($theta);        # small angles, typically
+    my $h = 1 - cos($theta);
+    return M_PI * ($a ** 2 + $h ** 2) * $R ** 2;
+}
+
+# get_radius_containing LAT LON NUMBER MAXIMUM
+# What radius circle around (LAT, LON) contains at least NUMBER people? If the
+# radius would be larger than MAXIMUM, return MAXIMUM instead.
+sub get_radius_containing ($$$$) {
+    my ($lat, $lon, $num, $max) = @_;
+    throw RABX::Error("LAT is out of range") if ($lat > 90 || $lat < -90);
+
+    throw RABX::Error("MAXIMUM must not be negative") if ($max < 0);
+    return 0.1 if ($max < 0.1);
+    $max *= 1000;
+
+    # Slightly nasty. We have to do tiresome vector arithmetic. Inevitably this
+    # means tedious mucking around between ellipsoidal polar and cartesian
+    # coordinates.
+
+    # Coordinates of the center of the circle. NB these are in meters.
+    my $v = [Geo::HelmertTransform::geo_to_xyz($datum, $lat, $lon, 0)];
+
+    # Approximation to the earth's radius.
+    my $Re = len3($v);
+
+    # Now construct east- and north-pointing vectors so that we have a local
+    # coordinate system.
+    my $w = [Geo::HelmertTransform::geo_to_xyz($datum, $lat, $lon + 0.1, 0)];
+    my $E = normalise3(sub3($v, $w));
+    $w = [Geo::HelmertTransform::geo_to_xyz($datum, $lat + 0.1, $lon, 0)];
+    my $N = normalise3(sub3($v, $w));
+
+    # And one which points outwards.
+    my $H = normalise3($v);
+
+    my $r0 = 100.;
+    my $area0 = spherical_cap_area($Re / 1000, $r0 / 1000);
+    my $P = get_density($lat, $lon) * $area0;
+#printf "%f %f\n", $r0, $P;
+    return $r0 if ($P > $num);
+    # Now work outwards in steps of 1km until we reach MAXIMUM or enclose at
+    # least NUMBER people.
+    my @rp = ([$r0, $P]);
+    for (my $r = 1000; $r < $max; $r += ($r < 15000 ? 1000 : 5000)) {
+        my $rr = ($r + $r0) / 2;
+        my $alpha = $rr / $Re;
+        # Step round the circle in ~1000m steps.
+        my $n = 2 * M_PI * $rr / ($r < 15000 ? 1000 : 5000);
+        $n = 10 if ($n < 10);
+        my $p = 0;
+        my $dens = 0;
+        for (my $i = 0; $i < $n; ++$i) {
+            my $phi = 2 * $i * M_PI / $n;
+
+            my $x = $v;
+            
+            my $a = $Re * sin($alpha);
+            my $b = $Re * (1 - cos($alpha));
+
+            $x = sub3($x, mul3($b, $H));
+            $x = add3($x, mul3(sin($phi) * $rr, $E));
+            $x = add3($x, mul3(cos($phi) * $rr, $N));
+
+            my ($lat1, $lon1) = Geo::HelmertTransform::xyz_to_geo($datum, $x->[0], $x->[1], $x->[2]);
+            $dens += get_density($lat1, $lon1);
+        }
+        $dens /= $n;
+        my $area = spherical_cap_area($Re / 1000, $r / 1000);
+        $P += $dens * ($area - $area0);
+
+        push(@rp, [$r, $P]);
+
+        if ($P > $num) {
+            # Interpolate to find the appropriate radius. P ~ r ** 2, so just
+            # use a quadratic interpolant.
+            my $q = pop(@rp);
+            my $A = $q->[1] / $q->[0] ** 2;
+            $q = pop(@rp);
+            $A += $q->[1] / $q->[0] ** 2;
+            $A *= 0.5;
+            return sqrt($num / $A) / 1000.;
+        }
+
+        $r0 = $r;
+        $area0 = $area;
+#printf "%f %f\n", $r0, $P;
+    }
+
+    return $max / 1000.;
+}
+
+package Gaze;
+
+=item get_population_density LAT LON
+
+Return an estimate of the population density at (LAT, LON) in persons per
+square kilometer.
+
+=cut
+sub get_population_density ($$) {
+    return Gaze::GPW::get_density($_[0], $_[1]);
+}
+
+=item get_radius_containing_population LAT LON NUMBER [MAXIMUM]
+
+Return an estimate of the radius (in km) of the smallest circle around (LAT,
+LON) which contains at least NUMBER people. If MAXIMUM is defined, return that
+value rather than any larger computed radius; if not specified, use 150km.
+
+=cut
+sub get_radius_containing_population ($$$;$) {
+    $_[3] ||= 150;
+    return Gaze::GPW::get_radius_containing($_[0], $_[1], $_[2], $_[3]);
 }
 
 1;
