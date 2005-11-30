@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.20 2005-11-30 14:39:51 chris Exp $
+# $Id: Gaze.pm,v 1.21 2005-11-30 20:19:27 chris Exp $
 #
 
 package Gaze;
@@ -247,14 +247,35 @@ sub strip_punctuation ($) {
 
 package Gaze::GPW;
 
+use Geo::Distance;
 use Geo::HelmertTransform;
 use IO::File;
+
+#
+# We use two GPW data files: one generated from the population density data,
+# and one from the whole population of each cell. The reason that both are
+# required is that GPW computes for each cell of the grid a land area, and its
+# measure of the population density is the population of the cell *divided by
+# that land area*. So where (say) a small island is the only land in a given
+# cell, GPW will record the population of the island, the area of the island,
+# and *the population density of the island itself* -- not the population of
+# the island divided by the area of the cell. This means that point estimates
+# of the population density are likely to be correct -- because in most cases
+# we will be asking for the population density of a place where there is known
+# to be population -- but if we want to integrate up the whole population the
+# GPW-recorded population density is NOT the right function to use. Instead we
+# need to smear the population out over the whole of each cell, because when
+# sampling the integrand we have no a priori knowledge of whether an individual
+# point lands on a populated place or not.
+#
 
 my $datum = Geo::HelmertTransform::datum('WGS84');
 
 my $f;
+my $f_pop;
 my $filename;
 my $datastart;
+my $datastart_pop;
 my ($west, $east, $south, $north, $xpitch, $ypitch, $cols, $rows);
 my $blurb_string = <<EOF;
 Gaze population density file -- DO NOT EDIT
@@ -264,7 +285,8 @@ EOF
 #
 sub read_gpw_data () {
     return if ($f);
-    $filename = mySociety::Config::get('GAZE_GPW_DATA');
+    #$filename = mySociety::Config::get('GAZE_GPW_DATA');
+    $filename = scalar(glob("/home/chris/tmp/gaze-popdensity.data"));
     $f = new IO::File($filename, O_RDONLY) 
                 || die "$filename: open: $!";
     # Grab data about the grid.
@@ -278,6 +300,11 @@ sub read_gpw_data () {
         = unpack('ddddddII', $header);
 #print join(", ", unpack('ddddddII', $header)), "\n";;
     $datastart = $f->getpos();
+
+    $f_pop = new IO::File("/home/chris/tmp/gaze-population.data", O_RDONLY)
+        || die "$!";
+    $f_pop->seek(length($blurb_string) + $len, 0);
+    $datastart_pop = $f_pop->getpos();
 }
 
 use constant M_PI => 3.141592654;
@@ -339,6 +366,38 @@ sub get_density ($;$) {
 #print "\$density = $density\n";
     $density = 0 if ($density < 0);
     return $density;
+}
+
+# get_population NUMBER | LAT LON
+# Return the total population of the cell NUMBER or at (LAT, LON).
+sub get_population ($;$) {
+    my $n = $_[0];
+    $n = get_cell_number($_[0], $_[1]) if (@_ == 2);
+    return 0. if ($n == -1);
+    $f_pop->setpos($datastart_pop) || die "$filename: setpos: $!";
+    $f_pop->seek($n * length(pack('d', 0)), 1) || die "$filename: lseek: $!";
+    my $b = '';
+    $f_pop->read($b, $cellsize) || die "$filename: read: $!";
+    my $pop = unpack('d', $b);
+#print "\$pop = $pop\n";
+    $pop = 0 if ($pop < 0);
+    return $pop;
+}
+
+sub rad ($) { return $_[0] * M_PI / 180; }
+
+# get_cellarea NUMBER | LAT LON
+# Return the total area (NOT the land area) of the cell NUMBER or at (LAT,
+# LON).
+sub get_cellarea ($;$) {
+    my $n = $_[0];
+    $n = get_cell_number($_[0], $_[1]) if (@_ == 2);
+    return -1. if ($n == -1);
+    # For a spherical earth, cell area depends only on latitude.
+    my $y = int($n / $cols);
+    my $lat1 = $north - $ypitch * $y;
+    my $lat2 = $lat1 - $ypitch;
+    return 2 * M_PI * abs(sin(rad($lat1)) - sin(rad($lat2))) * ($xpitch / 360) * Geo::Distance::R_e ** 2;
 }
 
 # utilities for 3-vectors
@@ -447,23 +506,19 @@ sub get_radius_containing ($$$$) {
             $x = add3($x, mul3(cos($phi) * $rr, $N));
 
             my ($lat1, $lon1) = Geo::HelmertTransform::xyz_to_geo($datum, $x->[0], $x->[1], $x->[2]);
-            $dens += get_density($lat1, $lon1);
+            $dens += get_population($lat1, $lon1) / get_cellarea($lat1, $lon1);
         }
         $dens /= $n;
         my $area = spherical_cap_area($Re / 1000, $r / 1000);
         $P += $dens * ($area - $area0);
-
         push(@rp, [$r, $P]);
+        shift(@rp) if (@rp == 3);
 
         if ($P > $num) {
-            # Interpolate to find the appropriate radius. P ~ r ** 2, so just
-            # use a quadratic interpolant.
-            my $q = pop(@rp);
-            my $A = $q->[1] / $q->[0] ** 2;
-            $q = pop(@rp);
-            $A += $q->[1] / $q->[0] ** 2;
-            $A *= 0.5;
-            return sqrt($num / $A) / 1000.;
+            # Interpolate to find the appropriate radius.
+            my ($r1, $P1) = @{$rp[0]};
+            my ($r2, $P2) = @{$rp[1]};
+            return ($r1 + ($r2 - $r2) * ($num - $P1) / ($P2 - $P1)) / 1000;
         }
 
         $r0 = $r;
