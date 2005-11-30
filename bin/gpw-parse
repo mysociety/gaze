@@ -1,0 +1,136 @@
+#!/usr/bin/perl -w
+#
+# parse-gpw:
+# Parse Gridded Population of the World data.
+#
+# Copyright (c) 2005 Chris Lightfoot. All rights reserved.
+# Email: chris@ex-parrot.com; WWW: http://www.ex-parrot.com/~chris/
+#
+
+my $rcsid = ''; $rcsid .= '$Id: gpw-parse,v 1.1 2005-11-30 11:46:44 chris Exp $';
+
+use strict;
+require 5.8.0;
+
+use IO::File;
+
+sub verbose (@);
+sub verbosef ($@);
+if (-t STDERR) {
+    eval 'sub verbose (@) { print STDERR @_; }';
+    eval 'sub verbosef ($@) { my $f = shift(@_); printf STDERR $f, @_; }';
+} else {
+    eval 'sub verbose (@) { }';
+    eval 'sub verbosef ($@) { my $f = shift(@_); sprintf($f, @_); }';
+}
+
+die "arguments should be GPW v2 E00 file and binary output file" if (@ARGV != 2);
+
+my ($infile, $outfile) = (@ARGV);
+
+verbose "reading '$infile'\n";
+
+my $f = new IO::File($infile, O_RDONLY)
+            || die "$infile: $!";
+my $out = new IO::File($outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644)
+            || die "$outfile: $!";
+
+sub nextline ($) {
+    my $f = shift;
+    my $l = $f->getline();
+    if (!defined($l)) {
+        if ($f->error()) {
+            die $!;
+        } else {
+            die "EOF";
+        }
+    }
+    chomp($l);
+    return $l;
+}
+
+# EXP  0 /NFS/NASA/PROJECTS/GPW/WORLD/DISTRIBUTE/GLDS95AG.E00
+$_ = nextline($f);
+die "first line of E00 file should begin 'EXP'"
+    unless (m#^EXP\s+0\s+(/.+)#);
+
+# GRD  2
+$_ = nextline($f);
+die "next line of E00 file should begin 'GRD'"
+    unless (m#^GRD\s+2$#);
+
+# Next is a line which appears to give the X- and Y- grid spacing, and a
+# specific value for mean 'n/a'.
+$_ = nextline($f);
+die "don't recognise rows/columns line"
+    unless (m#^\s+(0|[1-9]\d*)\s+(0|[1-9]\d*)\s+2(.+)#);
+my ($cols, $rows, $badval) = ($1, $2, $3);
+
+die "bad value '$badval' >= 0" unless ($badval < 0);
+
+verbose "$cols columns, $rows rows; n/a = '$badval'\n";
+
+my $real_re = '[ +-]0\.\d+E[+-]\d{2}';
+
+# Next line gives x- and y-spacing of grid
+$_ = nextline($f);
+die "don't recognise grid pitch line"
+    unless (m#($real_re)($real_re)#);
+
+my ($xpitch, $ypitch) = ($1, $2);
+verbosef("grid spacing: %g x %g\n", $xpitch, $ypitch);
+
+# Next is bottom-left (SW) corner.
+$_ = nextline($f);
+die "don't recognise top-left (SW) corner line"
+    unless (m#^($real_re)($real_re)$#);
+
+my ($west, $south) = ($1, $2);
+verbosef("SW corner: %f°S, %f°W\n", abs($south), abs($west));
+
+# Next is top-right (NE) corner.
+$_ = nextline($f);
+die "don't recognise top-right (NE) corner line"
+    unless (m#^($real_re)($real_re)$#);
+
+my ($east, $north) = ($1, $2);
+verbosef("NE corner: %f°N, %f°E\n", abs($north), abs($east));
+
+verbosef("%f + %d x %f = %f\n", $west, $cols, $ypitch, $west + $cols * $xpitch);
+verbosef("%f + %d x %f = %f\n", $south, $rows, $ypitch, $south + $rows * $ypitch);
+
+my $blurbstring = <<EOF;
+Gaze population density file -- DO NOT EDIT
+EOF
+
+# Record information about the grid.
+$out->print($blurbstring, pack('ddddddII', $west, $east, $south, $north, $xpitch, $ypitch, $cols, $rows));
+
+# Now scan the actual data.
+my @row = ( );
+my @raster = ( );
+my $n = 0;
+while ($n < ($rows * $cols)) {
+    $_ = nextline($f);
+    die "bad data line"
+        unless (m#^($real_re)+$#);
+    my @xx = grep { length($_) } split(/($real_re)/);
+#    print join(", ", map { sprintf("%g", $_) } @xx), "\n";
+
+    $n += @xx;
+    foreach (@xx) {
+        push(@row, $_);
+        if (@row == $cols) {
+            push(@raster, \@row);
+
+            # NB we are assuming that the 'bad' value is always negative.
+            $out->print(pack('d*', @row));
+            
+            @row = ( );
+            verbosef("\r%d/%d", scalar(@raster), $rows);
+        }
+    }
+}
+$out->close();
+verbosef("\r%d/%d\n", scalar(@raster), $rows);
+verbosef("have %d values total\n", $n);
