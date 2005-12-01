@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.24 2005-12-01 11:08:11 chris Exp $
+# $Id: Gaze.pm,v 1.25 2005-12-01 11:10:16 chris Exp $
 #
 
 package Gaze;
@@ -248,7 +248,6 @@ sub strip_punctuation ($) {
 package Gaze::GPW;
 
 use Geo::Distance;
-use Geo::HelmertTransform;
 use IO::File;
 use POSIX qw(acos asin);
 
@@ -269,8 +268,6 @@ use POSIX qw(acos asin);
 # sampling the integrand we have no a priori knowledge of whether an individual
 # point lands on a populated place or not.
 #
-
-my $datum = Geo::HelmertTransform::datum('WGS84');
 
 # Filehandles and data offsets for density and population data dumps.
 my ($f_d, $f_p);
@@ -478,7 +475,7 @@ sub get_radius_containing ($$$$) {
             # Interpolate to find the appropriate radius.
             my ($r1, $P1) = @{$rp[0]};
             my ($r2, $P2) = @{$rp[1]};
-            return ($r1 + ($r2 - $r2) * ($num - $P1) / ($P2 - $P1));
+            return ($r1 + ($r2 - $r1) * ($num - $P1) / ($P2 - $P1));
         }
 
         $r0 = $r;
