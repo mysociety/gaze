@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.22 2005-12-01 10:45:39 chris Exp $
+# $Id: Gaze.pm,v 1.23 2005-12-01 10:46:17 chris Exp $
 #
 
 package Gaze;
@@ -280,8 +280,8 @@ my $blurb_string = <<EOF;
 Gaze population density file -- DO NOT EDIT
 EOF
 
-# read_gpw_header
-#
+# read_gpw_data
+# Open the GPW data files.
 sub read_gpw_data () {
     return if ($f_d && $f_p);
     $path = mySociety::Config::get('GAZE_GPW_DATA_DIR');
