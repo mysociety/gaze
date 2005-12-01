@@ -3,11 +3,25 @@
 # parse-gpw:
 # Parse Gridded Population of the World data.
 #
-# Copyright (c) 2005 Chris Lightfoot. All rights reserved.
-# Email: chris@ex-parrot.com; WWW: http://www.ex-parrot.com/~chris/
+# Gaze requires dumps of two data files, one containing the population density
+# and the other containing the population counts per cell. In the 1995 (v2)
+# edition, these are called,
+# 
+# glds95ag.e00      density (ds)
+# glp95ag.e00       population (p)
+# 
+# These should be dumped into files named density.data and population.data in
+# some directory, which should then be named as OPTION_GAZE_GPW_DATA_DIR in the
+# services config file.
+# 
+# Get GPW data here:
+# http://sedac.ciesin.columbia.edu/plue/gpw/index.html?main.html&2
+#
+# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
+# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gpw-parse,v 1.1 2005-11-30 11:46:44 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gpw-parse,v 1.2 2005-12-01 10:49:29 chris Exp $';
 
 use strict;
 require 5.8.0;
