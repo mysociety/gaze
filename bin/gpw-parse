@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# parse-gpw:
+# gpw-parse:
 # Parse Gridded Population of the World data.
 #
 # Gaze requires dumps of two data files, one containing the population density
@@ -21,7 +21,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gpw-parse,v 1.2 2005-12-01 10:49:29 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gpw-parse,v 1.3 2005-12-01 12:50:59 francis Exp $';
 
 use strict;
 require 5.8.0;
