@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.21 2005-11-30 20:19:27 chris Exp $
+# $Id: Gaze.pm,v 1.22 2005-12-01 10:45:39 chris Exp $
 #
 
 package Gaze;
@@ -271,11 +271,10 @@ use IO::File;
 
 my $datum = Geo::HelmertTransform::datum('WGS84');
 
-my $f;
-my $f_pop;
-my $filename;
-my $datastart;
-my $datastart_pop;
+# Filehandles and data offsets for density and population data dumps.
+my ($f_d, $f_p);
+my ($datastart_d, $datastart_p);
+my $path;
 my ($west, $east, $south, $north, $xpitch, $ypitch, $cols, $rows);
 my $blurb_string = <<EOF;
 Gaze population density file -- DO NOT EDIT
@@ -284,27 +283,28 @@ EOF
 # read_gpw_header
 #
 sub read_gpw_data () {
-    return if ($f);
-    #$filename = mySociety::Config::get('GAZE_GPW_DATA');
-    $filename = scalar(glob("/home/chris/tmp/gaze-popdensity.data"));
-    $f = new IO::File($filename, O_RDONLY) 
-                || die "$filename: open: $!";
+    return if ($f_d && $f_p);
+    $path = mySociety::Config::get('GAZE_GPW_DATA_DIR');
+    $f_d = new IO::File("$path/density.data", O_RDONLY) 
+                || die "$path/density.data: open: $!";
     # Grab data about the grid.
     my $len = length(pack('ddddddII', qw(0 0 0 0 0 0 0 0)));
-    $f->seek(length($blurb_string), SEEK_SET)
-                || die "$filename: lseek: $!";
+    $f_d->seek(length($blurb_string), SEEK_SET)
+                || die "$path/density.data: lseek: $!";
     my $header = '';
-    $f->read($header, $len)
-                || die "$filename: read: $!";
+    $f_d->read($header, $len)
+                || die "$path/density.data: read: $!";
     ($west, $east, $south, $north, $xpitch, $ypitch, $cols, $rows)
         = unpack('ddddddII', $header);
-#print join(", ", unpack('ddddddII', $header)), "\n";;
-    $datastart = $f->getpos();
+    $datastart_d = $f_d->getpos();
 
-    $f_pop = new IO::File("/home/chris/tmp/gaze-population.data", O_RDONLY)
-        || die "$!";
-    $f_pop->seek(length($blurb_string) + $len, 0);
-    $datastart_pop = $f_pop->getpos();
+    # Grab the population data too, but assume that its header is the same as
+    # that of the density data.
+    $f_p = new IO::File("$path/population.data", O_RDONLY)
+        || die "$path/population.data: open: $!";
+    $f_p->seek(length($blurb_string) + $len, 0)
+        || die "$path/population.data: seek: $!";
+    $datastart_p = $f_p->getpos();
 }
 
 use constant M_PI => 3.141592654;
@@ -358,10 +358,13 @@ sub get_density ($;$) {
     my $n = $_[0];
     $n = get_cell_number($_[0], $_[1]) if (@_ == 2);
     return 0. if ($n == -1);
-    $f->setpos($datastart) || die "$filename: setpos: $!";
-    $f->seek($n * length(pack('d', 0)), 1) || die "$filename: lseek: $!";
+    $f_d->setpos($datastart_d)
+        || die "$path/density.data: setpos: $!";
+    $f_d->seek($n * length(pack('d', 0)), 1)
+        || die "$path/density.data: lseek: $!";
     my $b = '';
-    $f->read($b, $cellsize) || die "$filename: read: $!";
+    $f_d->read($b, $cellsize)
+        || die "$path/density.data: read: $!";
     my $density = unpack('d', $b);
 #print "\$density = $density\n";
     $density = 0 if ($density < 0);
@@ -374,10 +377,13 @@ sub get_population ($;$) {
     my $n = $_[0];
     $n = get_cell_number($_[0], $_[1]) if (@_ == 2);
     return 0. if ($n == -1);
-    $f_pop->setpos($datastart_pop) || die "$filename: setpos: $!";
-    $f_pop->seek($n * length(pack('d', 0)), 1) || die "$filename: lseek: $!";
+    $f_p->setpos($datastart_p)
+        || die "$path/population.data: setpos: $!";
+    $f_p->seek($n * length(pack('d', 0)), 1)
+        || die "$path/population.data: lseek: $!";
     my $b = '';
-    $f_pop->read($b, $cellsize) || die "$filename: read: $!";
+    $f_p->read($b, $cellsize)
+        || die "$path/population.data: read: $!";
     my $pop = unpack('d', $b);
 #print "\$pop = $pop\n";
     $pop = 0 if ($pop < 0);
@@ -460,6 +466,8 @@ sub get_radius_containing ($$$$) {
     # Slightly nasty. We have to do tiresome vector arithmetic. Inevitably this
     # means tedious mucking around between ellipsoidal polar and cartesian
     # coordinates.
+    # XXX actually should do it with azimuth and offset -- it's not that
+    # painful.
 
     # Coordinates of the center of the circle. NB these are in meters.
     my $v = [Geo::HelmertTransform::geo_to_xyz($datum, $lat, $lon, 0)];
