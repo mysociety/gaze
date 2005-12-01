@@ -1,27 +1,34 @@
 #!/usr/bin/perl -w
 #
 # gpw-parse:
-# Parse Gridded Population of the World data.
+# Convert Gridded Population of the World data into the format Gaze uses.
 #
-# Gaze requires dumps of two data files, one containing the population density
-# and the other containing the population counts per cell. In the 1995 (v2)
-# edition, these are called,
+# Example usage:
+# gpw-parse glds95ag.e00 $dir/density.data
+# gpw-parse glp95ag.e00 $dir/population.data
+#
+# Get GPW data here:
+#   http://sedac.ciesin.columbia.edu/plue/gpw/index.html?main.html&2
+# Specifically, for GPW v2:
+#   ftp://ftp.ciesin.org/pub/gpw/global/v2glds95ag.zip
+#   ftp://ftp.ciesin.org/pub/gpw/global/v2glp95ag.zip
+#
+# The Gaze service requires dumps of the two data files, one containing the
+# population density and the other containing the population counts per cell.
+# In the 1995 (v2) edition, these are called,
 # 
 # glds95ag.e00      density (ds)
 # glp95ag.e00       population (p)
 # 
-# These should be dumped into files named density.data and population.data in
-# some directory, which should then be named as OPTION_GAZE_GPW_DATA_DIR in the
-# services config file.
+# These should be converted using gpw-parse into files named density.data and
+# population.data in some directory, which should then be named as
+# OPTION_GAZE_GPW_DATA_DIR in the services config file.
 # 
-# Get GPW data here:
-# http://sedac.ciesin.columbia.edu/plue/gpw/index.html?main.html&2
-#
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gpw-parse,v 1.3 2005-12-01 12:50:59 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gpw-parse,v 1.4 2005-12-01 17:02:08 francis Exp $';
 
 use strict;
 require 5.8.0;
