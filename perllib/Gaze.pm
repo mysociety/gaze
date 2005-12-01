@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.23 2005-12-01 10:46:17 chris Exp $
+# $Id: Gaze.pm,v 1.24 2005-12-01 11:08:11 chris Exp $
 #
 
 package Gaze;
@@ -250,6 +250,7 @@ package Gaze::GPW;
 use Geo::Distance;
 use Geo::HelmertTransform;
 use IO::File;
+use POSIX qw(acos asin);
 
 #
 # We use two GPW data files: one generated from the population density data,
@@ -391,10 +392,11 @@ sub get_population ($;$) {
 }
 
 sub rad ($) { return $_[0] * M_PI / 180; }
+sub deg ($) { return $_[0] * 180 / M_PI; }
 
 # get_cellarea NUMBER | LAT LON
 # Return the total area (NOT the land area) of the cell NUMBER or at (LAT,
-# LON).
+# LON), in square kilometers.
 sub get_cellarea ($;$) {
     my $n = $_[0];
     $n = get_cell_number($_[0], $_[1]) if (@_ == 2);
@@ -406,36 +408,17 @@ sub get_cellarea ($;$) {
     return 2 * M_PI * abs(sin(rad($lat1)) - sin(rad($lat2))) * ($xpitch / 360) * Geo::Distance::R_e ** 2;
 }
 
-# utilities for 3-vectors
-sub len3 ($) {
-    my $v = shift;
-    return sqrt($v->[0] ** 2 + $v->[1] ** 2 + $v->[2] ** 2);
-}
-
-sub add3 ($$) {
-    my ($a, $b) = @_;
-    return [map { $a->[$_] + $b->[$_] } (0 .. 2)];
-}
-
-sub sub3 ($$) {
-    my ($a, $b) = @_;
-    return [map { $a->[$_] - $b->[$_] } (0 .. 2)];
-}
-
-sub mul3 ($$) {
-    my ($s, $v) = @_;
-    return [map { $_ * $s } @$v];
-}
-
-sub normalise3 ($) {
-    return mul3(1 / len3($_[0]), $_[0]);
-}
-
-sub dot3 ($$) {
-    my ($a, $b) = @_;
-    my $d = 0;
-    map { $a->[$_] * $b->[$_] } (0 .. 2);
-    return $d;
+# add_azimuth_offset LAT LON AZIMUTH OFFSET
+# Find the latitude and longitude at a distance OFFSET from (LAT, LON) in the
+# direction of AZIMUTH. LAT, LON are in degrees, AZIMUTH in radians, and OFFSET
+# in km.  Return in list context the new latitude and longitude.
+sub add_azimuth_offset ($$$$) {
+    my ($lat, $lon, $theta, $off) = @_;
+    # http://www.codeguru.com/Cpp/Cpp/algorithms/general/article.php/c5115/
+    my $b = $off / Geo::Distance::R_e;
+    my $a = acos(cos($b) * cos(rad(90 - $lat)) + sin(rad(90 - $lat)) * sin($b) * cos($theta));
+    my $B = asin(sin($b) * sin($theta) / sin($a));
+    return (90 - deg($a), deg($B) + $lon);
 }
 
 # spherical_cap_area R1 R2
@@ -461,63 +444,32 @@ sub get_radius_containing ($$$$) {
 
     throw RABX::Error("MAXIMUM must not be negative") if ($max < 0);
     return 0.1 if ($max < 0.1);
-    $max *= 1000;
 
-    # Slightly nasty. We have to do tiresome vector arithmetic. Inevitably this
-    # means tedious mucking around between ellipsoidal polar and cartesian
-    # coordinates.
-    # XXX actually should do it with azimuth and offset -- it's not that
-    # painful.
-
-    # Coordinates of the center of the circle. NB these are in meters.
-    my $v = [Geo::HelmertTransform::geo_to_xyz($datum, $lat, $lon, 0)];
-
-    # Approximation to the earth's radius.
-    my $Re = len3($v);
-
-    # Now construct east- and north-pointing vectors so that we have a local
-    # coordinate system.
-    my $w = [Geo::HelmertTransform::geo_to_xyz($datum, $lat, $lon + 0.1, 0)];
-    my $E = normalise3(sub3($v, $w));
-    $w = [Geo::HelmertTransform::geo_to_xyz($datum, $lat + 0.1, $lon, 0)];
-    my $N = normalise3(sub3($v, $w));
-
-    # And one which points outwards.
-    my $H = normalise3($v);
-
-    my $r0 = 100.;
-    my $area0 = spherical_cap_area($Re / 1000, $r0 / 1000);
+    my $r0 = 0.1;
+    my $area0 = spherical_cap_area(Geo::Distance::R_e, $r0);
     my $P = get_density($lat, $lon) * $area0;
 #printf "%f %f\n", $r0, $P;
     return $r0 if ($P > $num);
-    # Now work outwards in steps of 1km until we reach MAXIMUM or enclose at
+
+    # Now work outwards in small steps until we reach MAXIMUM or enclose at
     # least NUMBER people.
     my @rp = ([$r0, $P]);
-    for (my $r = 1000; $r < $max; $r += ($r < 15000 ? 1000 : 5000)) {
+    for (my $r = 1; $r < $max; $r += ($r < 15 ? 1 : 5)) {
         my $rr = ($r + $r0) / 2;
-        my $alpha = $rr / $Re;
-        # Step round the circle in ~1000m steps.
-        my $n = 2 * M_PI * $rr / ($r < 15000 ? 1000 : 5000);
+        my $alpha = $rr / Geo::Distance::R_e;
+        # Step round the circle in ~2500m steps.
+        my $n = 2 * M_PI * $rr / ($r < 15 ? 2.5 : 5);
         $n = 10 if ($n < 10);
         my $p = 0;
         my $dens = 0;
         for (my $i = 0; $i < $n; ++$i) {
             my $phi = 2 * $i * M_PI / $n;
-
-            my $x = $v;
-            
-            my $a = $Re * sin($alpha);
-            my $b = $Re * (1 - cos($alpha));
-
-            $x = sub3($x, mul3($b, $H));
-            $x = add3($x, mul3(sin($phi) * $rr, $E));
-            $x = add3($x, mul3(cos($phi) * $rr, $N));
-
-            my ($lat1, $lon1) = Geo::HelmertTransform::xyz_to_geo($datum, $x->[0], $x->[1], $x->[2]);
-            $dens += get_population($lat1, $lon1) / get_cellarea($lat1, $lon1);
+            my ($lat1, $lon1) = add_azimuth_offset($lat, $lon, $phi, $rr);
+            my $n = get_cell_number($lat1, $lon1);
+            $dens += get_population($n) / get_cellarea($n);
         }
         $dens /= $n;
-        my $area = spherical_cap_area($Re / 1000, $r / 1000);
+        my $area = spherical_cap_area(Geo::Distance::R_e, $r);
         $P += $dens * ($area - $area0);
         push(@rp, [$r, $P]);
         shift(@rp) if (@rp == 3);
@@ -526,7 +478,7 @@ sub get_radius_containing ($$$$) {
             # Interpolate to find the appropriate radius.
             my ($r1, $P1) = @{$rp[0]};
             my ($r2, $P2) = @{$rp[1]};
-            return ($r1 + ($r2 - $r2) * ($num - $P1) / ($P2 - $P1)) / 1000;
+            return ($r1 + ($r2 - $r2) * ($num - $P1) / ($P2 - $P1));
         }
 
         $r0 = $r;
@@ -534,7 +486,7 @@ sub get_radius_containing ($$$$) {
 #printf "%f %f\n", $r0, $P;
     }
 
-    return $max / 1000.;
+    return $max;
 }
 
 package Gaze;
