@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.7 2005-11-30 15:02:59 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.8 2005-12-01 17:09:54 francis Exp $';
 
 use strict;
 
@@ -143,6 +143,7 @@ my %dispatch = (
                     "number of persons",
                     sub ($) {
                         my $num = shift;
+                        my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $num += 0.; };
                         return "'$num' is not a valid real number" if ($w);
                         return "'$num' must not be negative" if ($num < 0);
@@ -152,6 +153,7 @@ my %dispatch = (
                     "maximum radius to return (default 150km)",
                     sub ($) {
                         my $max = shift;
+                        my $w = undef;
                         return undef if (!defined($max));
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $max += 0.; };
                         return "'$max' is not a valid real number" if ($w);
@@ -232,7 +234,7 @@ while (my $q = new CGI::Fast()) {
             }
         } elsif ($f eq 'get_population_density') {
             try {
-                $r = get_population_density($v{lat}, $v{lon});
+                $r = Gaze::get_population_density($v{lat}, $v{lon});
             } catch RABX::Error with {
                 my $E = shift;
                 $r = undef;
@@ -241,7 +243,7 @@ while (my $q = new CGI::Fast()) {
             $r .= "\n";
         } elsif ($f eq 'get_radius_containing_population') {
             try {
-                $r = get_radius_containing_population($v{lat}, $v{lon}, $v{number}, $v{maximum});
+                $r = Gaze::get_radius_containing_population($v{lat}, $v{lon}, $v{number}, $v{maximum});
             } catch RABX::Error with {
                 my $E = shift;
                 $r = undef;
