@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.25 2005-12-01 11:10:16 chris Exp $
+# $Id: Gaze.pm,v 1.26 2005-12-05 15:41:54 chris Exp $
 #
 
 package Gaze;
@@ -187,6 +187,12 @@ sub find_places ($$$;$$) {
         push(@results, [dbh()->selectrow_array('select full_name, in_qualifier, near_qualifier, lat, lon, state, ?::int from feature, name where feature.ufi = name.ufi and feature.ufi = ? and is_primary', {}, $score{$ufi}, $ufi)]);
         $first_score = $score{$ufi} if !$first_score;
     }
+
+    # XXX suggestion from Mark: in the case where the best matches have the
+    # same name, we should promote the one which has a higher population
+    # density (or smaller radius-containing-N), as this is more likely to be
+    # the right one.
+
     return \@results;
 }
 
