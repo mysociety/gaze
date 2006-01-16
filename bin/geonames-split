@@ -13,7 +13,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-split,v 1.1 2005-08-30 14:32:06 config-tea Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-split,v 1.2 2006-01-16 18:22:38 francis Exp $';
 
 use strict;
 require 5.8.0;
@@ -30,7 +30,7 @@ use Text::CSV;
 
 use mySociety::Config;
 BEGIN {
-    mySociety::Config::set_file("$FindBin::Bin/../../conf/general");
+    mySociety::Config::set_file("$FindBin::Bin/../conf/general");
 }
 use mySociety::DBHandle qw(dbh);
 

@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.8 2005-12-01 17:09:54 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.9 2006-01-16 18:22:38 francis Exp $';
 
 use strict;
 
@@ -16,7 +16,7 @@ require 5.8.0;
 # Do this first of all, because Gaze.pm needs to see the config file.
 BEGIN {
     use mySociety::Config;
-    mySociety::Config::set_file('../../conf/general');
+    mySociety::Config::set_file('../conf/general');
 }
 
 use CGI::Fast;
