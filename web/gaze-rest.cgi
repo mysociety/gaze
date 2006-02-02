@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.9 2006-01-16 18:22:38 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.10 2006-02-02 16:16:50 chris Exp $';
 
 use strict;
 
@@ -229,7 +229,7 @@ while (my $q = new CGI::Fast()) {
                 $ct = 'text/csv; charset=utf-8';
                 $r = qq("Name","In","Near","Latitude","Longitude","State","Score"\r\n);
                 foreach (@$l) {
-                    $r .= join(",", map { my $x = $_; $x =~ s/"/""/g; qq("$x") } @$_) . "\r\n";
+                    $r .= join(",", map { my $x = $_; $x ||= ''; $x =~ s/"/""/g; qq("$x") } @$_) . "\r\n";
                 }
             }
         } elsif ($f eq 'get_population_density') {
