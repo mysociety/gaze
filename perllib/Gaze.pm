@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.26 2005-12-05 15:41:54 chris Exp $
+# $Id: Gaze.pm,v 1.27 2006-02-02 16:24:45 chris Exp $
 #
 
 package Gaze;
@@ -231,7 +231,7 @@ sub get_country_from_ip ($) {
     # which a proper country code is not available. These are of almost no
     # value to us, so suppress them.
     my %continent = map { $_ => 1 } qw(AF AN AS EU NA OC SA);
-    $country = undef if (exists($continent{$country}));
+    $country = undef if (defined($country) && exists($continent{$country}));
     return $country;
 }
 
