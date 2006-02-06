@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.27 2006-02-02 16:24:45 chris Exp $
+# $Id: Gaze.pm,v 1.28 2006-02-06 10:16:29 chris Exp $
 #
 
 package Gaze;
@@ -118,12 +118,14 @@ sub find_places ($$$;$$) {
     my ($country, $state, $query, $maxresults, $minscore) = @_;
     $maxresults ||= 10;
     $minscore ||= 0;
-    throw RABX::Error("Country code must be exactly two capital letters") unless ($country =~ m/^[A-Z][A-Z]$/);
+    throw RABX::Error("Country code must be exactly two capital letters", RABX::Error::USER)
+        unless ($country =~ m/^[A-Z][A-Z]$/);
 
     # Xapian databases for different countries.
     our %X;
     my $countryxapiandb = mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . "/gazeidx-$country";
-    throw RABX::Error("Gazeteer not available for $country") if (!-d $countryxapiandb);
+    throw RABX::Error("Gazeteer not available for $country", RABX::Error::USER)
+        if (!-d $countryxapiandb);
     $X{$country} ||= new Search::Xapian::Database($countryxapiandb);
     my $X = $X{$country};
 
@@ -320,7 +322,8 @@ sub get_cell_number ($$) {
     my ($lat, $lon) = @_;
     read_gpw_data();
 
-    throw RABX::Error("Latitude is out of range") if ($lat > 90 || $lat < -90);
+    throw RABX::Error("Latitude is out of range", RABX::Error::USER)
+        if ($lat > 90 || $lat < -90);
     
     # 
     # GPW is cell-based: each element in the grid specifies the population in
@@ -443,9 +446,11 @@ sub spherical_cap_area ($$) {
 # radius would be larger than MAXIMUM, return MAXIMUM instead.
 sub get_radius_containing ($$$$) {
     my ($lat, $lon, $num, $max) = @_;
-    throw RABX::Error("LAT is out of range") if ($lat > 90 || $lat < -90);
+    throw RABX::Error("LAT is out of range", RABX::Error::USER)
+        if ($lat > 90 || $lat < -90);
 
-    throw RABX::Error("MAXIMUM must not be negative") if ($max < 0);
+    throw RABX::Error("MAXIMUM must not be negative", RABX::Error::USER)
+        if ($max < 0);
     return 0.1 if ($max < 0.1);
 
     my $r0 = 0.1;
