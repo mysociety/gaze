@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.10 2006-02-02 16:16:50 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.11 2006-03-01 17:17:26 chris Exp $';
 
 use strict;
 
@@ -70,6 +70,7 @@ my %dispatch = (
                     "query term, at least two UTF-8 characters",
                     sub ($) {
                         my $x = $_[0];
+                        return 'missing' if (!defined($x));
                         return "not valid UTF-8"
                             if (!utf8::decode($x));
                         return "too short"
@@ -100,6 +101,7 @@ my %dispatch = (
                     "WGS84 latitude, in north-positive decimal degrees",
                     sub ($) {
                         my $lat = shift;
+                        return 'missing' if (!defined($lat));
                         my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $lat += 0.; };
                         return "'$lat' is not a valid real number" if ($w);
@@ -111,6 +113,7 @@ my %dispatch = (
                     "WGS84 longitude, in east-positive decimal degrees",
                     sub ($) {
                         my $lon = shift;
+                        return 'missing' if (!defined($lon));
                         my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $lon += 0.; };
                         return "'$lon' is not a valid real number" if ($w);
@@ -123,6 +126,7 @@ my %dispatch = (
                     "WGS84 latitude, in north-positive decimal degrees",
                     sub ($) {
                         my $lat = shift;
+                        return 'missing' if (!defined($lat));
                         my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $lat += 0.; };
                         return "'$lat' is not a valid real number" if ($w);
@@ -134,6 +138,7 @@ my %dispatch = (
                     "WGS84 longitude, in east-positive decimal degrees",
                     sub ($) {
                         my $lon = shift;
+                        return 'missing' if (!defined($lon));
                         my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $lon += 0.; };
                         return "'$lon' is not a valid real number" if ($w);
@@ -143,6 +148,7 @@ my %dispatch = (
                     "number of persons",
                     sub ($) {
                         my $num = shift;
+                        return 'missing' if (!defined($num));
                         my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $num += 0.; };
                         return "'$num' is not a valid real number" if ($w);
@@ -153,8 +159,8 @@ my %dispatch = (
                     "maximum radius to return (default 150km)",
                     sub ($) {
                         my $max = shift;
-                        my $w = undef;
                         return undef if (!defined($max));
+                        my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $max += 0.; };
                         return "'$max' is not a valid real number" if ($w);
                         return "'$max' must not be negative" if ($max < 0);
