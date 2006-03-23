@@ -26,4 +26,6 @@ do
     echo
 done
 
+$BINPATH/xapian-compact
+
 

@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# xapian-compact:
+# Compact all the Xapian databases for Gaze.
+# 
+# usage:
+# ./xapian-compact
+# Location of database is read from GAZE_XAPIAN_INDEX_DIR in
+# services/Gaze/conf/general
+#
+# Copyright (c) 2006 UK Citizens Online Democracy. All rights reserved.
+# Email: francis@mysociety.org; WWW: http://www.mysociety.org/
+#
+
+set -e
+
+BINPATH=`dirname $0`
+. $BINPATH/../../../shlib/deployfns
+
+TOTAL_SAVED=0
+read_conf $BINPATH/../conf/general
+for X in $OPTION_GAZE_XAPIAN_INDEX_DIR/gazeidx-??
+do 
+    echo "compacting $X"
+    rm -fr $X-compacted
+    rm -fr $X-old
+    quartzcompact --fuller $X $X-compacted >/dev/null
+    BEFORE=`du -k $X | cut -f 1`
+    AFTER=`du -k $X-compacted | cut -f 1`
+    TOTAL_SAVED=$((TOTAL_SAVED + BEFORE - AFTER))
+    echo "saved so far: $TOTAL_SAVED kilobytes"
+    mv $X $X-old
+    mv $X-compacted $X
+    rm -fr $X-old
+done
+echo "total saved by compacting: $TOTAL_SAVED kilobytes"
+
+
