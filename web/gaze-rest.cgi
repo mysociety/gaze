@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.11 2006-03-01 17:17:26 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.12 2006-03-24 12:51:30 chris Exp $';
 
 use strict;
 
@@ -214,7 +214,6 @@ while (my $q = new CGI::Fast()) {
             $r = Gaze::get_country_from_ip($v{ip});
             $r ||= '';
             $r .= "\n";
-            warn "$r\n";
         } elsif ($f eq 'get_find_places_countries') {
             if ($countries_last < time() - 60) {
                 my %countries = map { $_ => 1 } @{Gaze::get_find_places_countries()};
