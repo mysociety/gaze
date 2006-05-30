@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.8 2006-01-16 18:22:38 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.9 2006-05-30 11:23:46 chris Exp $';
 
 use strict;
 
@@ -33,23 +33,30 @@ use Gaze;
 my $req = FCGI::Request();
 my $W = new mySociety::WatchUpdate();
 
+use constant cache_age => 86400;
+
 while ($req->Accept() >= 0) {
     RABX::Server::CGI::dispatch(
-            'Gaze.find_places' => sub {
-                Gaze::find_places($_[0], $_[1], $_[2], $_[3], $_[4]);
-            },
-            'Gaze.get_country_from_ip' => sub {
-                Gaze::get_country_from_ip($_[0]);
-            },
-            'Gaze.get_find_places_countries' => sub {
-                Gaze::get_find_places_countries();
-            },
-            'Gaze.get_population_density' => sub {
-                Gaze::get_population_density($_[0], $_[1]);
-            },
-            'Gaze.get_radius_containing_population' => sub {
-                Gaze::get_radius_containing_population($_[0], $_[1], $_[2], $_[3]);
-            }
+            'Gaze.find_places' => [
+                sub { Gaze::find_places($_[0], $_[1], $_[2], $_[3], $_[4]); },
+                cache_age
+            ],
+            'Gaze.get_country_from_ip' => [
+                sub { Gaze::get_country_from_ip($_[0]); },
+                cache_age
+            ],
+            'Gaze.get_find_places_countries' => [
+                sub { Gaze::get_find_places_countries(); },
+                cache_age
+            ],
+            'Gaze.get_population_density' => [
+                sub { Gaze::get_population_density($_[0], $_[1]); },
+                cache_age
+            ],
+            'Gaze.get_radius_containing_population' => [
+                sub { Gaze::get_radius_containing_population($_[0], $_[1], $_[2], $_[3]); },
+                cache_age
+            ]
         );
     last if ($W->changed());
 }

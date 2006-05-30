@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.12 2006-03-24 12:51:30 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.13 2006-05-30 11:23:46 chris Exp $';
 
 use strict;
 
@@ -259,7 +259,8 @@ while (my $q = new CGI::Fast()) {
         if ($r) {
             print $q->header(
                         -content_type => $ct,
-                        -content_length => length($r)
+                        -content_length => length($r),
+                        -cache_control => 'max-age=86400'
                     ), $r;
         }
     }
