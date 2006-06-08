@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.13 2006-05-30 11:23:46 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.14 2006-06-08 14:55:22 chris Exp $';
 
 use strict;
 
@@ -27,6 +27,9 @@ use Regexp::Common qw(net);
 use utf8;
 
 use Gaze;
+
+binmode(STDIN);
+binmode(STDOUT);
 
 my $W = new mySociety::WatchUpdate();
 
