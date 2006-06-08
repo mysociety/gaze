@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.14 2006-06-08 14:55:22 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.15 2006-06-08 14:58:53 chris Exp $';
 
 use strict;
 
@@ -260,6 +260,7 @@ while (my $q = new CGI::Fast()) {
             $r .= "\n";
         }
         if ($r) {
+            utf8::encode($r);
             print $q->header(
                         -content_type => $ct,
                         -content_length => length($r),
