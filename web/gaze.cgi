@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.9 2006-05-30 11:23:46 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.10 2006-08-15 19:52:02 chris Exp $';
 
 use strict;
 
@@ -47,6 +47,10 @@ while ($req->Accept() >= 0) {
             ],
             'Gaze.get_find_places_countries' => [
                 sub { Gaze::get_find_places_countries(); },
+                cache_age
+            ],
+            'Gaze.get_country_bounding_coords' => [
+                sub { Gaze::get_country_bounding_coords($_[0]); },
                 cache_age
             ],
             'Gaze.get_population_density' => [

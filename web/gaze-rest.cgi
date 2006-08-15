@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.15 2006-06-08 14:58:53 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.16 2006-08-15 19:52:02 chris Exp $';
 
 use strict;
 
@@ -95,6 +95,18 @@ my %dispatch = (
                         return undef if (!defined($_[0]));
                         return "invalid"
                             unless ($_[0] =~ /^(100|[1-9]\d|[1-9])*$/);
+                        return undef;
+                    }
+                ]
+            },
+            get_country_bounding_coords => {
+                country => [
+                    "ISO country code of country for which to return bounding coordinates",
+                    sub ($) {
+                        return "missing"
+                            if (!defined($_[0]));
+                        return "invalid"
+                            if ($_[0] !~ /^[A-Z]{2}$/ || !exists($countries{$_[0]}));
                         return undef;
                     }
                 ]
@@ -240,24 +252,34 @@ while (my $q = new CGI::Fast()) {
                     $r .= join(",", map { my $x = $_; $x ||= ''; $x =~ s/"/""/g; qq("$x") } @$_) . "\r\n";
                 }
             }
+        } elsif ($f eq 'get_country_bounding_coords') {
+            my $cc;
+            try {
+                $cc = Gaze::get_country_bounding_coords($v{country});
+            } catch RABX::Error with {
+                my $E = shift;
+                $r = undef;
+                error($q, get_country_bounding_coords => $E->text());
+            };
+            if ($cc) {
+                $r = join(' ', @$cc) . "\n"
+            }
         } elsif ($f eq 'get_population_density') {
             try {
-                $r = Gaze::get_population_density($v{lat}, $v{lon});
+                $r = Gaze::get_population_density($v{lat}, $v{lon}) . "\n";
             } catch RABX::Error with {
                 my $E = shift;
                 $r = undef;
                 error($q, get_population_density => $E->text());
             };
-            $r .= "\n";
         } elsif ($f eq 'get_radius_containing_population') {
             try {
-                $r = Gaze::get_radius_containing_population($v{lat}, $v{lon}, $v{number}, $v{maximum});
+                $r = Gaze::get_radius_containing_population($v{lat}, $v{lon}, $v{number}, $v{maximum}) . "\n";
             } catch RABX::Error with {
                 my $E = shift;
                 $r = undef;
                 error($q, get_population_density => $E->text());
             };
-            $r .= "\n";
         }
         if ($r) {
             utf8::encode($r);
