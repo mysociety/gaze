@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.28 2006-02-06 10:16:29 chris Exp $
+# $Id: Gaze.pm,v 1.29 2006-08-15 19:08:09 chris Exp $
 #
 
 package Gaze;
@@ -247,6 +247,29 @@ sub strip_punctuation ($) {
     my $t = shift;
     $t =~ s#[^[:alpha:][0-9]]##g; # [0-9] because US place names quite commonly contain numbers
     return $t;
+}
+
+ 
+=item get_country_bounding_coords COUNTRY
+
+Returns a 4 element list containing the latitude of the most northerly and
+southernly places, and the longitude of the most easterly and westerly places
+in COUNTRY. (NB these will always lie *inside* the true bounding coordinates
+of the COUNTRY itself.)
+
+=cut
+sub get_country_bounding_coords ($) {
+    my $country = shift;
+    throw RABX::Error("Country code must be exactly two capital letters", RABX::Error::USER)
+        unless ($country =~ m/^[A-Z][A-Z]$/);
+    my ($max_lat, $min_lat, $max_long, $min_long)
+        dbh()->selectrow_array('
+                select max(lat), min(lat), max(lon), min(lon)
+                from feature
+                where country = ?', {}, $country);
+    throw RABX::Error("No bounds known for country '$country'")
+        unless (defined($max_lat));
+    return [$max_lat, $min_lat, $max_long, $min_long];
 }
 
 #
