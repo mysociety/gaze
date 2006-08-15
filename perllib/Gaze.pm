@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.29 2006-08-15 19:08:09 chris Exp $
+# $Id: Gaze.pm,v 1.30 2006-08-15 19:44:51 chris Exp $
 #
 
 package Gaze;
@@ -262,13 +262,30 @@ sub get_country_bounding_coords ($) {
     my $country = shift;
     throw RABX::Error("Country code must be exactly two capital letters", RABX::Error::USER)
         unless ($country =~ m/^[A-Z][A-Z]$/);
-    my ($max_lat, $min_lat, $max_long, $min_long)
-        dbh()->selectrow_array('
-                select max(lat), min(lat), max(lon), min(lon)
-                from feature
-                where country = ?', {}, $country);
+    my ($max_lat, $min_lat, $max_long, $min_long);
+    # Awful query syntax because PG (in 7.3 at least) doesn't much fancy
+    # making use of the index unless you (a) rewrite the aggregate query
+    # as an order by ... limit 1; and (b) mention all the columns in the
+    # index in the order by ... clause. When we upgrade we can rewrite
+    # this as a simple select max(lat), min(lat), ....
+    $max_lat = dbh()->selectrow_array('
+                select lat from feature where country = ?
+                order by country, lat desc
+                limit 1', {}, $country);
     throw RABX::Error("No bounds known for country '$country'")
         unless (defined($max_lat));
+    $min_lat = dbh()->selectrow_array('
+                select lat from feature where country = ?
+                order by country, lat
+                limit 1', {}, $country);
+    $max_lon = dbh()->selectrow_array('
+                select lon from feature where country = ?
+                order by country, lon desc
+                limit 1', {}, $country);
+    $min_lon = dbh()->selectrow_array('
+                select lon from feature where country = ?
+                order by country, lon
+                limit 1', {}, $country);
     return [$max_lat, $min_lat, $max_long, $min_long];
 }
 
