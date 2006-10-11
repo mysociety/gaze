@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.8 2006-01-16 18:22:38 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.9 2006-10-11 17:51:33 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -66,36 +66,37 @@ while (defined(my $line = <STDIN>)) {
     print "Reading names: ", ++$nr, "\r";
     chomp($line);
     my @f = split(/\|/, $line);
+
     # Fields are:
-    #   feature ID
-    #   state code
-    #   feature name
-    #   feature type
-    #   county name
-    #   FIPS state number
-    #   FIPS county number
-    #   latitude (DMS)
-    #   longitude (DMS)
-    #   latitude (decimal)
-    #   longitude (decimal)
-    #   source latitude (DMS)   -- not sure what these are
-    #   source longitude (DMS)
-    #   source latitude (decimal)
-    #   source longitude (decimal)
+    #   feature ID (0)
+    #   feature name(1 - previously 2)
+    #   feature type(2 - previously 3)
+    #   state code (3 - previously 1)
+    #   FIPS state number(4 - previously 5)
+    #   county name(5 - previously 4)
+    #   FIPS county number(6)
+    #   latitude (DMS) (7)
+    #   longitude (DMS) (8)
+    #   latitude (decimal) (9)
+    #   longitude (decimal) (10)
+    #   source latitude (DMS)  (11) -- not sure what these are
+    #   source longitude (DMS) (12)
+    #   source latitude (decimal) (13)
+    #   source longitude (decimal) (14)
     #   elevation
     #   estimated population
     #   Federal status
     #   cell name   -- which map sheet it's on, I think
 
     # Only use 'populated places'
-    next unless ($f[3] eq 'ppl');
+    next unless ($f[2] eq 'Populated Place');
 
     # Some places have no location.
     next if ($f[7] eq 'UNKNOWN' || !defined($f[9]) || !defined($f[10]));
 
     # Names are coded in Latin1, apparently.
-    utf8::upgrade($f[2]);
-    utf8::upgrade($f[4]);
+    utf8::upgrade($f[1]);
+    utf8::upgrade($f[5]);
 
     # http://geonames.usgs.gov/gnis_users_guide_descripdbs.html
     # Two special terms are used in parentheses. The word historical signifies
@@ -104,12 +105,12 @@ while (defined(my $line = <STDIN>)) {
     # division.
     #
     # Drop historic names, but keep subdivisions.
-    next if ($f[2] =~ m# \(historical\)$#);
+    next if ($f[1] =~ m# \(historical\)$#);
 
     # Strip the '(subdivision)' note.
-    $f[2] =~ s# \([a-z]+\)##;
+    $f[1] =~ s# \([a-z]+\)##;
     
-    $place{$f[0]} = [$f[2], $f[1], $f[4], $f[9], $f[10]];
+    $place{$f[0]} = [$f[1], $f[3], $f[5], $f[9], $f[10]];
 
     my $canon = lc(Gaze::strip_punctuation($f[2]));
     push(@{$name{$canon}}, $f[0]);
