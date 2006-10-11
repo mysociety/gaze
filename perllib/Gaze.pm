@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.31 2006-08-15 19:48:56 chris Exp $
+# $Id: Gaze.pm,v 1.32 2006-10-11 17:46:19 chris Exp $
 #
 
 package Gaze;
@@ -143,7 +143,13 @@ sub find_places ($$$;$$) {
     my %isprimary;
 
     my $terms = Gaze::split_name_parts($query);
-    my $enq = $X->enquire(OP_OR, keys(%$terms));
+
+    # If a state is specified, require resulting terms to match it.
+    my $query = new Search::Xapian::Query(OP_OR, keys(%$terms));
+    $query = new Search::Xapian::Query(OP_AND, "state:$state", $query)
+        if ($state);
+
+    my $enq = $X->enquire($query);
 
     # grab more than maxresults from xapian, so we can show all those with
     # same highest score (e.g. there are about 30 Cambridges)
@@ -163,12 +169,8 @@ sub find_places ($$$;$$) {
         foreach my $match (@matches) {
             my $score = $match->get_percent();
             my $uni = $match->get_document()->get_data();
-            my ($ufi, $isprimary);
-            if ($state) {
-                ($ufi, $isprimary) = dbh()->selectrow_array('select ufi, is_primary from name where uni = ? and (select state from feature where feature.ufi = name.ufi) = ?', {}, $uni, $state);
-            } else {
-                ($ufi, $isprimary) = dbh()->selectrow_array('select ufi, is_primary from name where uni = ?', {}, $uni);
-            }
+            my ($ufi, $isprimary)
+                = dbh()->selectrow_array('select ufi, is_primary from name where uni = ?', {}, $uni);
             if (defined($ufi) && (!exists($score{$ufi}) || $score{$ufi} < $score)) {
                 $score{$ufi} = $score;
                 $uni{$ufi} = $uni;
