@@ -13,7 +13,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.8 2006-03-23 14:03:31 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: xapian-index,v 1.9 2006-10-11 17:47:59 chris Exp $';
 
 use strict;
 require 5.8.0;
@@ -45,7 +45,7 @@ my $db_final_name = mySociety::Config::get('GAZE_XAPIAN_INDEX_DIR') . '/gazeidx-
 my $db_temp_name = $db_final_name . '-new';
 
 print STDERR "Retrieving names... ";
-my $q = dbh()->prepare('select name.uni, full_name from name, feature where name.ufi = feature.ufi and feature.country = ?');
+my $q = dbh()->prepare('select name.uni, feature.state, full_name from name, feature where name.ufi = feature.ufi and feature.country = ?');
 $q->execute($country);
 my $N = $q->rows();
 print STDERR "done\n";
@@ -57,7 +57,7 @@ if (-d $db_temp_name) { rmtree($db_temp_name) or die "couldn't remove '$db_temp_
 my $X = new Search::Xapian::WritableDatabase($db_temp_name, Search::Xapian::DB_CREATE);
 
 my $nn = 0;
-while (my ($uni, $name) = $q->fetchrow_array()) {
+while (my ($uni, $state, $name) = $q->fetchrow_array()) {
     print STDERR "\rIndexing names: $nn/$N" if (($nn % 100) == 0);
     ++$nn;
     my $h = Gaze::split_name_parts($name);
@@ -67,6 +67,8 @@ while (my ($uni, $name) = $q->fetchrow_array()) {
     foreach (keys %$h) {
         $d->add_term($_, $h->{$_});
     }
+
+    $d->add_term("state:$state") if ($state);
 
     # Assume that we have not indexed it before.
     $X->add_document($d);
