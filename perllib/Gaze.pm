@@ -6,7 +6,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.32 2006-10-11 17:46:19 chris Exp $
+# $Id: Gaze.pm,v 1.33 2006-10-16 16:59:44 francis Exp $
 #
 
 package Gaze;
@@ -145,11 +145,12 @@ sub find_places ($$$;$$) {
     my $terms = Gaze::split_name_parts($query);
 
     # If a state is specified, require resulting terms to match it.
-    my $query = new Search::Xapian::Query(OP_OR, keys(%$terms));
-    $query = new Search::Xapian::Query(OP_AND, "state:$state", $query)
-        if ($state);
+    my $xap_query = new Search::Xapian::Query(OP_OR, keys(%$terms));
+    if ($state) {
+        $xap_query = new Search::Xapian::Query(OP_AND, "state:$state", $xap_query)
+    }
 
-    my $enq = $X->enquire($query);
+    my $enq = $X->enquire($xap_query);
 
     # grab more than maxresults from xapian, so we can show all those with
     # same highest score (e.g. there are about 30 Cambridges)
