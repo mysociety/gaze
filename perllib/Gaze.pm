@@ -1,4 +1,3 @@
-#!/usr/bin/perl
 #
 # Gaze.pm:
 # Common code for global gazetteer.
@@ -6,7 +5,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.33 2006-10-16 16:59:44 francis Exp $
+# $Id: Gaze.pm,v 1.34 2006-10-16 18:33:18 francis Exp $
 #
 
 package Gaze;
@@ -21,6 +20,7 @@ use Geo::IP;
 use POSIX qw(acos);
 use Search::Xapian qw(:ops);
 use File::Find;
+use RABX;
 
 BEGIN {
     mySociety::DBHandle::configure(
@@ -147,7 +147,8 @@ sub find_places ($$$;$$) {
     # If a state is specified, require resulting terms to match it.
     my $xap_query = new Search::Xapian::Query(OP_OR, keys(%$terms));
     if ($state) {
-        $xap_query = new Search::Xapian::Query(OP_AND, "state:$state", $xap_query)
+        $xap_query = new Search::Xapian::Query(OP_AND, 
+            new Search::Xapian::Query("state:$state"), $xap_query);
     }
 
     my $enq = $X->enquire($xap_query);
