@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.19 2006-12-01 16:37:43 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.20 2006-12-01 16:39:22 matthew Exp $';
 
 use strict;
 
@@ -301,9 +301,9 @@ while (my $q = new CGI::Fast()) {
             }
         }
         if ($f eq 'get_places_near') {
-	    $errors{'distance'} = 'Missing; must give one of distance or population'
-	        if (!$v{'distance'} && !$v{'population'});
-	}
+            $errors{'distance'} = 'Missing; must give one of distance or population'
+                if (!$v{'distance'} && !$v{'population'});
+        }
 
         my $ct = 'text/plain; charset=utf-8';
         my $r;
@@ -369,6 +369,7 @@ while (my $q = new CGI::Fast()) {
                 error($q, get_population_density => $E->text());
             };
         } elsif ($f eq 'get_places_near') {
+            my $l;
             try {
                 $l = Gaze::get_places_near($v{lat}, $v{lon},
                     { distance=>$v{distance}, country=>$v{country},
