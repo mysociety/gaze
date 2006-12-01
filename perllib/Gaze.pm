@@ -5,7 +5,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.34 2006-10-16 18:33:18 francis Exp $
+# $Id: Gaze.pm,v 1.35 2006-12-01 15:35:22 matthew Exp $
 #
 
 package Gaze;
@@ -292,6 +292,23 @@ sub get_country_bounding_coords ($) {
     return [$max_lat, $min_lat, $max_lon, $min_lon];
 }
 
+=item get_coords_from_ip ADDRESS
+
+Return (lat,lon) of the centre of the country for the given IP address,
+or undef if none could be found.
+
+=cut
+
+sub get_coords_from_ip($){
+    my $addr = shift;
+    my $country = get_country_from_ip($addr);
+    return unless $country;
+
+    my $res = get_country_bounding_coords ($country);
+    my ($max_lat,$min_lat,$max_lon,$min_lon) = @$res;
+    return (($max_lat + $min_lat)/2, ($max_lon + $min_lon)/2); 
+}
+
 #
 # Gridded Population of the World stuff
 #
@@ -562,6 +579,53 @@ value rather than any larger computed radius; if not specified, use 150km.
 sub get_radius_containing_population ($$$;$) {
     $_[3] ||= 150;
     return Gaze::GPW::get_radius_containing($_[0], $_[1], $_[2], $_[3]);
+}
+
+=item get_list_in_range PLACE_INFO [COUNTRY] [CALC_DISTANCE]
+
+Returns a reference to an associative array of all the places 
+within a given distance of a point expressed in latitude/longitude.
+Only include results from COUNTRY if given. If CALC_DISTANCE is
+specified, include the distance of each place from the given one.
+   
+associative array place_info holds latitude ('lat') longitude ('lon')
+population ('population') and maxdistance ('maxdistance').
+
+=cut
+
+sub get_list_in_range($;$$){
+    my ($place_info, $country, $calc_distance) = @_;
+
+    my $lat = $place_info->{'lat'};
+    my $lon = $place_info->{'lon'};
+    my $population = $place_info->{'population'};
+    my $maxdistance = $place_info->{'maxdistance'} || 150;
+    
+    my %results; # final results list 
+
+    # work out the distance and convert to bounding lat/long rectangle
+    my $distance = get_radius_containing_population($lat,$lon,$population,$maxdistance);
+
+    # extract data from database
+    my $country_sql = "";
+    $country_sql = " WHERE country = '$country'" if $country;
+    my $q = dbh()->prepare("select name,country,state,lat,lon,distance
+        from place_find_nearby(?,?,?) AS nearby" . $country_sql);
+
+    $q->execute($lat,$lon,$distance);
+
+    # put into results array
+    while (my ($name,$cntry,$state,$lat2,$lon2, $dist) = $q->fetchrow_array()) {
+        my $info = $cntry;
+        $info.=",$state" if $state;
+        if ($calc_distance) {
+            $results{$name} = $info . ":" . $dist;
+        } else {
+            $results{$name} = $info;
+        }
+    }
+
+    return \%results;
 }
 
 1;
