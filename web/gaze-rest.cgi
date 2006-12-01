@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.18 2006-12-01 16:35:30 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.19 2006-12-01 16:37:43 matthew Exp $';
 
 use strict;
 
@@ -372,7 +372,7 @@ while (my $q = new CGI::Fast()) {
             try {
                 $l = Gaze::get_places_near($v{lat}, $v{lon},
                     { distance=>$v{distance}, country=>$v{country},
-                      population=>$v{number}, maxdistance=>$v{maximum} }) . "\n";
+                      population=>$v{population}, maxdistance=>$v{maximum} }) . "\n";
             } catch RABX::Error with {
                 my $E = shift;
                 $r = undef;
