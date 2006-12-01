@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.10 2006-08-15 19:52:02 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.11 2006-12-01 16:28:25 matthew Exp $';
 
 use strict;
 
@@ -45,6 +45,10 @@ while ($req->Accept() >= 0) {
                 sub { Gaze::get_country_from_ip($_[0]); },
                 cache_age
             ],
+            'Gaze.get_coords_from_ip' => [
+                sub { Gaze::get_coords_from_ip($_[0]); },
+                cache_age
+            ],
             'Gaze.get_find_places_countries' => [
                 sub { Gaze::get_find_places_countries(); },
                 cache_age
@@ -59,6 +63,10 @@ while ($req->Accept() >= 0) {
             ],
             'Gaze.get_radius_containing_population' => [
                 sub { Gaze::get_radius_containing_population($_[0], $_[1], $_[2], $_[3]); },
+                cache_age
+            ],
+            'Gaze.get_places_near' => [
+                sub { Gaze::get_places_near($_[0], $_[1], $_[2]); },
                 cache_age
             ]
         );

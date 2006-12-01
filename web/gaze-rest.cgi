@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.16 2006-08-15 19:52:02 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.17 2006-12-01 16:28:25 matthew Exp $';
 
 use strict;
 
@@ -39,6 +39,18 @@ my $countries_last = time();
 
 my %dispatch = (
         get_country_from_ip => {
+                ip => [
+                    "IP address for which to return country, in dotted-quad notation",
+                    sub ($) {
+                        return "missing"
+                            if (!defined($_[0]));
+                        return "invalid"
+                            unless ($_[0] =~ /^$RE{net}{IPv4}$/);
+                        return undef;
+                    }
+                ]
+            },
+        get_coords_from_ip => {
                 ip => [
                     "IP address for which to return country, in dotted-quad notation",
                     sub ($) {
@@ -184,6 +196,74 @@ my %dispatch = (
                     }
                 ]
             },
+            get_places_near => {
+                lat => [
+                    "WGS84 latitude, in north-positive decimal degrees",
+                    sub ($) {
+                        my $lat = shift;
+                        return 'missing' if (!defined($lat));
+                        my $w = undef;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $lat += 0.; };
+                        return "'$lat' is not a valid real number" if ($w);
+                        return "'$lat' is out-of-range (should be in [-90, 90])"
+                            if ($lat < -90 || $lat > 90);
+                        return undef;
+                    }
+                ], lon => [
+                    "WGS84 longitude, in east-positive decimal degrees",
+                    sub ($) {
+                        my $lon = shift;
+                        return 'missing' if (!defined($lon));
+                        my $w = undef;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $lon += 0.; };
+                        return "'$lon' is not a valid real number" if ($w);
+                        return undef;
+                    }
+                ], distance => [
+                    "distance in kilometres",
+                    sub ($) {
+                        my $d = shift;
+                        return undef if (!defined($d));
+                        my $w = undef;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $d += 0.; };
+                        return "'$d' is not a valid real number" if ($w);
+                        return "'$d' must not be negative" if ($d < 0);
+                        return "'$d' is greater than the circumference of the earth" if ($d > 41000);
+                        return undef;
+                    }
+                ], population => [
+                    "number of persons to calculate circle radius",
+                    sub ($) {
+                        my $num = shift;
+                        return undef if (!defined($num));
+                        my $w = undef;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $num += 0.; };
+                        return "'$num' is not a valid real number" if ($w);
+                        return "'$num' must not be negative" if ($num < 0);
+                        return undef;
+                    }
+                ], maximum => [
+                    "maximum radius to return (default 150km)",
+                    sub ($) {
+                        my $max = shift;
+                        return undef if (!defined($max));
+                        my $w = undef;
+                        eval { local $SIG{__WARN__} = sub { $w = shift; }; $max += 0.; };
+                        return "'$max' is not a valid real number" if ($w);
+                        return "'$max' must not be negative" if ($max < 0);
+                        return "'$max' is greater than the circumference of the earth" if ($max > 41000);
+                        return undef;
+                    }
+                ], country => [
+                    "ISO country code of country to limit results to (optional)",
+                    sub ($) {
+                        return undef if (!defined($_[0]));
+                        return "invalid"
+                            if ($_[0] !~ /^[A-Z]{2}$/ || !exists($countries{$_[0]}));
+                        return undef;
+                    }
+                ]
+            },
            
     );
 
@@ -220,6 +300,10 @@ while (my $q = new CGI::Fast()) {
                 $errors{$p} = "$r; should be $desc" if (defined($r));
             }
         }
+        if ($f eq 'get_places_near') {
+	    $errors{'distance'} = 'Missing; must give one of distance or population'
+	        if (!$v{'distance'} && !$v{'population'});
+	}
 
         my $ct = 'text/plain; charset=utf-8';
         my $r;
@@ -227,6 +311,10 @@ while (my $q = new CGI::Fast()) {
             error($q, %errors);
         } elsif ($f eq 'get_country_from_ip') {
             $r = Gaze::get_country_from_ip($v{ip});
+            $r ||= '';
+            $r .= "\n";
+        } elsif ($f eq 'get_coords_from_ip') {
+            $r = Gaze::get_coords_from_ip($v{ip});
             $r ||= '';
             $r .= "\n";
         } elsif ($f eq 'get_find_places_countries') {
@@ -279,6 +367,16 @@ while (my $q = new CGI::Fast()) {
                 my $E = shift;
                 $r = undef;
                 error($q, get_population_density => $E->text());
+            };
+        } elsif ($f eq 'get_places_near') {
+            try {
+                $r = Gaze::get_places_near($v{lat}, $v{lon},
+                    { distance=>$v{distance}, country=>$v{country},
+                      population=>$v{number}, maxdistance=>$v{maximum} }) . "\n";
+            } catch RABX::Error with {
+                my $E = shift;
+                $r = undef;
+                error($q, get_places_near => $E->text());
             };
         }
         if ($r) {
