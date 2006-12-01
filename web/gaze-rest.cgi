@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.17 2006-12-01 16:28:25 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.18 2006-12-01 16:35:30 matthew Exp $';
 
 use strict;
 
@@ -370,7 +370,7 @@ while (my $q = new CGI::Fast()) {
             };
         } elsif ($f eq 'get_places_near') {
             try {
-                $r = Gaze::get_places_near($v{lat}, $v{lon},
+                $l = Gaze::get_places_near($v{lat}, $v{lon},
                     { distance=>$v{distance}, country=>$v{country},
                       population=>$v{number}, maxdistance=>$v{maximum} }) . "\n";
             } catch RABX::Error with {
@@ -378,6 +378,14 @@ while (my $q = new CGI::Fast()) {
                 $r = undef;
                 error($q, get_places_near => $E->text());
             };
+            if ($l) {
+                # CSV formatted per http://www.ietf.org/internet-drafts/draft-shafranovich-mime-csv-05.txt
+                $ct = 'text/csv; charset=utf-8';
+                $r = qq("Name","Country","State","Latitude","Longitude","Distance"\r\n);
+                foreach (@$l) {
+                    $r .= join(",", map { my $x = $_; $x ||= ''; $x =~ s/"/""/g; qq("$x") } @$_) . "\r\n";
+                }
+            }
         }
         if ($r) {
             utf8::encode($r);

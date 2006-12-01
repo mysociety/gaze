@@ -5,7 +5,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.36 2006-12-01 16:28:24 matthew Exp $
+# $Id: Gaze.pm,v 1.37 2006-12-01 16:35:30 matthew Exp $
 #
 
 package Gaze;
@@ -583,7 +583,7 @@ sub get_radius_containing_population ($$$;$) {
 
 =item get_places_near LAT LON [PARAMS]
 
-Returns a reference to an associative array of all the places 
+Returns a reference to an array of all the places 
 within a given distance of a point expressed as LAT LON.
 PARAMS include:
 * DISTANCE to include all results within DISTANCE km
@@ -617,13 +617,11 @@ sub get_places_near($$;$){
 
     $q->execute($lat, $lon, $distance);
 
-    my %results;
+    my @results;
     while (my ($name,$cntry,$state,$lat2,$lon2, $dist) = $q->fetchrow_array()) {
-        my $info = $cntry;
-        $info.=",$state" if $state;
-        $results{$name} = $info . ":" . $dist;
+        push @results, [ $name, $cntry, $state, $lat2, $lon2, $dist ];
     }
-    return \%results;
+    return \@results;
 }
 
 1;
