@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.22 2007-01-03 23:10:48 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.23 2007-01-03 23:17:13 matthew Exp $';
 
 use strict;
 
@@ -315,7 +315,7 @@ while (my $q = new CGI::Fast()) {
             $r .= "\n";
         } elsif ($f eq 'get_coords_from_ip') {
             my ($lat, $lon) = Gaze::get_coords_from_ip($v{ip});
-            my $r = ($lat && $lon) ? "$lat,$lon" : '';
+            $r = ($lat && $lon) ? "$lat,$lon" : '';
             $r .= "\n";
         } elsif ($f eq 'get_find_places_countries') {
             if ($countries_last < time() - 60) {
