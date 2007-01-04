@@ -4,7 +4,145 @@
 <body>
 <h1>Gaze - the mySociety Gazetteer web service</h1>
 
-<p>For information about Gaze, read the 
+
+<h3>Usage instructions</h3>
+<p>
+When calling
+        <a href="http://gaze.mysociety.org/gaze-rest">http://gaze.mysociety.org/gaze-rest</a>
+parameter f is always the function name, with the following parameters. 
+The content of the page returned is whitespace seperated, except where otherwise specified.
+</p>
+
+
+<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_country_from_ip;ip=130.88.200.10">get_country_from_ip</a></h4>
+<ul>
+	<li>"ip" is the IP address to lookup</li>
+</ul>
+<p>
+           Return the ISO country code for the given IP address, or
+           undef if none could be found.
+</p>
+
+
+<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_coords_from_ip;ip=130.88.200.10">get_coords_from_ip</a></h4>
+<ul>
+	<li> "ip" is the IP address to lookup</li>
+</ul>
+<p>
+           Return latitude and longitude of the centre of the country for the
+           given IP address, or undef if none could be found.
+</p>
+
+<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_find_places_countries">get_find_places_countries</a></h4>
+<p>This function takes no parameters and returns list of
+   countries which find_places will work for (one item per line).
+</p.
+
+
+<h4><a href="http://gaze.mysociety.org/gaze-rest?f=find_places;country=US;query=Manchester">find_places</a></h4>
+<ul>
+        <li>"country" is the ISO country code to search for places</li>
+        <li>"state" is the optional state within a country to search in.</li>
+        <li>"query" is the name being looked for.</li>
+        <li>"maxresults" is the maximum results to return (optional)</li>
+        <li>"minscore" is the smallest percentage score for results.</li>
+</ul>
+
+<p>
+           Returns a CSV file of places in COUNTRY (ISO code) which match
+           the given search QUERY.  The country must be from the
+           list returned by get_find_places_countries.  STATE, if
+           specified, is a customary code for a top-level
+           administrative subregion within the given
+           COUNTRY; at present, this is only useful for the
+           United States. 
+</p>
+<p>
+           Returns a set of lines, in the format 
+<pre>
+                NAME, IN, NEAR, LATITUDE, LONGITUDE, STATE, SCORE
+</pre>
+           When IN is defined,
+           it gives the name of a region in which the place lies;
+           when NEAR is defined, it gives a short list of other
+           places near to the returned place.  These allow
+           nonunique names to be disambiguated by the user.
+           LATITUDE and LONGITUDE are in decimal degrees,
+           north- and east-positive, in WGS84. Earlier
+           entries in the returned list are better matches
+           to the query.
+
+           At most MAXRESULTS (default, 20) results, and only
+           results with score at least MINSCORE (default 0, per-
+           centage from 0 to 100) are returned. The MAXRESULTS
+           limit is ignored when the top results all have the
+           same relevancy. They are all returned. So for example,
+           this means that if you search for Cambridge in the US
+           with MAXRESULTS of 5, it will return all the
+           Cambridges, even though there are more than 5 of
+           them.
+</p>
+
+<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_country_bounding_coords;country=GB">get_country_bounding_coords</a></h4>
+<ul>
+        <li>"country" is the ISO country code to return co-ordinates for</li>
+</ul>
+<p>
+           Returns a space sperated line containing the latitude of
+           the most northerly and southernly places, and the lon-
+           gitude of the most easterly and westerly places in
+           COUNTRY. (NB these will always lie *inside* the true
+           bounding coordinates of the COUNTRY itself.)
+</p>
+
+
+<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_population_density;lat=53.4780349399915;lon=-2.2443008422851562">get_population_density</a></h4>
+<ul>
+  <li>"lat" is the latitude, north-positive in decimal degrees</li>
+  <li>"lon" is the longtitude, east-positive in decimal degrees</li>
+</ul>
+<p>
+           Returns an estimate of the population density at (LAT,
+           LON) in persons per square kilometer.
+</p>
+ 
+<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_radius_containing_population;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000">get_radius_containing_population</a></h4>
+<ul>
+  <li>"lat" is the latitude, north-positive in decimal degrees</li>
+  <li>"lon" is the longtitude, east-positive in decimal degrees</li>
+  <li>"number" is the population</li>
+  <li>"maximum" is the maximum radius to return (default 150, optional)</li>
+</ul>
+<p>
+          Return an estimate of the radius (in km) of the
+          smallest circle around (LAT, LON) which contains
+          at least NUMBER people. If MAXIMUM is defined,
+          return that value rather than any larger computed
+          radius; if not specified, use 150km.
+</p>
+
+<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_places_near;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000;distance=100">get_places_near</a></h4>
+<ul>
+  <li>"lat" is the latitude, north-positive in decimal degrees</li>
+  <li>"lon" is the longtitude, east-positive in decimal degrees</li>
+  <li>"population" is the number of persons to calculate circle radius (optional)</li>
+  <li>"distance" is the maximum distance population (optional)</li>
+  <li>"country" is the ISO country code to limit results to (optional)</li>
+</ul>
+
+<p>Population or Distance must be specified</p>
+<p>
+           Returns a CSV formatted page of all the places
+           within a given distance of a point expressed as LAT
+           LON.  PARAMS include: * DISTANCE to include all
+           results within DISTANCE km * POPULATION to include all
+           results within a circle containing at
+           least POPULATION people * MAXDISTANCE, can be sup-
+           plied with POPULATION to bound the distance returned *
+           COUNTRY to bound results to one COUNTRY
+</p>
+
+<p>There is also additional information in the 
 <a href="http://www.mysociety.org/?p=83">blog post which announced its launch</a>,
 and another <a href="http://www.mysociety.org/?p=96">blog post about population density</a>.
 
