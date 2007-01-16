@@ -5,7 +5,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.37 2006-12-01 16:35:30 matthew Exp $
+# $Id: Gaze.pm,v 1.38 2007-01-16 21:30:03 sams Exp $
 #
 
 package Gaze;
@@ -238,6 +238,10 @@ sub get_country_from_ip ($) {
     # value to us, so suppress them.
     my %continent = map { $_ => 1 } qw(AF AN AS EU NA OC SA);
     $country = undef if (defined($country) && exists($continent{$country}));
+
+
+
+
     return $country;
 }
 
@@ -289,6 +293,8 @@ sub get_country_bounding_coords ($) {
                 select lon from feature where country = ?
                 order by country, lon
                 limit 1', {}, $country);
+
+
     return [$max_lat, $min_lat, $max_lon, $min_lon];
 }
 
@@ -306,6 +312,14 @@ sub get_coords_from_ip($){
 
     my $res = get_country_bounding_coords ($country);
     my ($max_lat,$min_lat,$max_lon,$min_lon) = @$res;
+
+    if ($country eq 'US' ) { 
+    		# US includes Hawaii and Midway which are on either side of the
+    		# international date line; the middle of that is in Algeria
+		# these numbers are continental US.
+    	($max_lat, $min_lat, $max_lon, $min_lon)= (45.9817, 32.50976, -67.2802, -123.442);
+    }
+
     return (($max_lat + $min_lat)/2, ($max_lon + $min_lon)/2); 
 }
 
