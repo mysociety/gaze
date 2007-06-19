@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.9 2006-10-11 17:51:33 chris Exp $';
+my $rcsid = ''; $rcsid .= '$Id: usgs-geonames-parse,v 1.10 2007-06-19 14:46:52 francis Exp $';
 
 use strict;
 require 5.8.0;
@@ -133,7 +133,7 @@ my %deleted;
 # (LAT, LON).
 sub find_places_near ($$$) {
     my ($lat, $lon, $dist) = @_;
-    my ($lat_l, $lat_h) = ($lat - Gaze::deg($dist / Gaze::R_e), $lat + Gaze::deg($dist / Gaze::R_e));
+    my ($lat_l, $lat_h) = ($lat - Geo::Distance::deg($dist / Geo::Distance::R_e), $lat + Geo::Distance::deg($dist / Geo::Distance::R_e));
     my ($ind_l, $ind_h);    # Bracketing indexes for search in list of UFIs
 
     # Find low limit of UFIs.
