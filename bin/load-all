@@ -3,28 +3,46 @@
 # Loads all country data into gaze. 
 
 # To use:
-# 1) Make a new directory (must be empty), and download
+# 1) Make a new directory (must be empty), and download something like
 #    http://earth-info.nga.mil/gns/html/geonames_dd_dms_date_20050801.zip
+#    http://earth-info.nga.mil/gns/html/geonames_dd_dms_date_20070612.zip
+#    (get latest link from  "single compressed zip that contains the entire
+#    country files dataset" on http://earth-info.nga.mil/gns/html/cntry_files.html) 
 # 2) Unzip and extract the .txt file
 # 3) With the directory as current directory, run geonames-split with that file
 #    as input, to make split-XX.txt files 
 # 4) Again with same current directory, run this script.
+#
+# Specify two letter country code as parameter to just do that country.
 
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 
 set -e
+#set -x # debug
 
 BINPATH=`dirname $0`
-for FILE in split-??.txt
-do
-    COUNTRY=${FILE:6:2}
+
+function do_country {
+    COUNTRY=$1
+    FILE=split-$COUNTRY.txt
     echo "Loading names for country $COUNTRY"
     cat $FILE | $BINPATH/geonames-parse
     echo "Xapian indexing for $COUNTRY"
     $BINPATH/xapian-index $COUNTRY
     echo
-done
+}
+
+if [ "$1" != "" ]
+then
+    do_country $1
+else
+    for FILE in split-??.txt
+    do
+        COUNTRY=${FILE:6:2}
+        do_country $COUNTRY
+    done
+fi
 
 $BINPATH/xapian-compact
 

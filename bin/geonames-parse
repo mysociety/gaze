@@ -11,11 +11,13 @@
 # Get country files here:
 #   http://earth-info.nga.mil/gns/html/cntry_files.html
 #
+# For US see usgs-geonames-parse
+#
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.28 2006-01-16 18:22:38 francis Exp $';
+my $rcsid = ''; $rcsid .= '$Id: geonames-parse,v 1.29 2007-06-19 14:28:28 francis Exp $';
 
 use strict;
 require 5.8.0;
@@ -199,7 +201,7 @@ sub process_one_country($$) {
     # LON).
     my $find_places_near = sub ($$$) {
         my ($lat, $lon, $dist) = @_;
-        my ($lat_l, $lat_h) = ($lat - Gaze::deg($dist / Gaze::R_e), $lat + Gaze::deg($dist / Gaze::R_e));
+        my ($lat_l, $lat_h) = ($lat - Geo::Distance::deg($dist / Geo::Distance::R_e), $lat + Geo::Distance::deg($dist / Geo::Distance::R_e));
         my ($ind_l, $ind_h);    # Bracketing indexes for search in list of UFIs
 
         # Find low limit of UFIs.
