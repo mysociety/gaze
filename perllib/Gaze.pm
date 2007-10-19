@@ -5,7 +5,7 @@
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
-# $Id: Gaze.pm,v 1.38 2007-01-16 21:30:03 sams Exp $
+# $Id: Gaze.pm,v 1.39 2007-10-19 19:20:28 matthew Exp $
 #
 
 package Gaze;
@@ -229,7 +229,7 @@ found.
 =cut
 sub get_country_from_ip ($) {
     my ($addr) = @_;
-    return undef if ($addr =~ /^127\./);
+    return undef if (!$addr || $addr =~ /^127\./);
     our $geoip;
     $geoip ||= new Geo::IP(GEOIP_STANDARD);
     my $country = $geoip->country_code_by_addr($addr);
@@ -238,9 +238,6 @@ sub get_country_from_ip ($) {
     # value to us, so suppress them.
     my %continent = map { $_ => 1 } qw(AF AN AS EU NA OC SA);
     $country = undef if (defined($country) && exists($continent{$country}));
-
-
-
 
     return $country;
 }
