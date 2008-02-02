@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.23 2007-01-03 23:17:13 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.24 2008-02-02 12:30:50 matthew Exp $';
 
 use strict;
 
@@ -32,6 +32,14 @@ binmode(STDIN);
 binmode(STDOUT);
 
 my $W = new mySociety::WatchUpdate();
+
+# FastCGI signal handling
+my $exit_requested = 0;
+my $handling_request = 0;
+$SIG{TERM} = $SIG{USR1} = sub {
+    $exit_requested = 1;
+    # exit(0) unless $handling_request;
+};
 
 # XXX do this in Gaze.pm?
 my %countries = map { $_ => 1 } @{Gaze::get_find_places_countries()};
@@ -278,6 +286,7 @@ sub error ($%) {
 }
     
 while (my $q = new CGI::Fast()) {
+    $handling_request = 1;
     my $f = $q->param('f');
     if (!defined($f)) {
         error($q, f => "missing (should specify function)");
@@ -397,5 +406,7 @@ while (my $q = new CGI::Fast()) {
                     ), $r;
         }
     }
-    last if ($W->changed());
+    $W->exit_if_changed();
+    $handling_request = 0;
+    last if $exit_requested;
 }
