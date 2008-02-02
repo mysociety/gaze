@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.12 2008-02-02 12:30:50 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.13 2008-02-02 19:45:54 matthew Exp $';
 
 use strict;
 
@@ -36,10 +36,10 @@ my $W = new mySociety::WatchUpdate();
 # FastCGI signal handling
 my $exit_requested = 0;
 my $handling_request = 0;
-$SIG{TERM} = $SIG{USR1} = sub {
-    $exit_requested = 1;
-    # exit(0) unless $handling_request;
-};
+#$SIG{TERM} = $SIG{USR1} = sub {
+#    $exit_requested = 1;
+#    # exit(0) unless $handling_request;
+#};
 
 use constant cache_age => 86400;
 
