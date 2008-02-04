@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.14 2008-02-04 16:32:07 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.15 2008-02-04 17:44:43 matthew Exp $';
 
 use strict;
 
@@ -23,7 +23,7 @@ BEGIN {
     mySociety::Config::set_file('../conf/general');
 }
 
-use mySociety::CGIFast;
+use CGI::Fast;
 use RABX;
 
 use mySociety::WatchUpdate;
@@ -34,7 +34,7 @@ my $W = new mySociety::WatchUpdate();
 
 use constant cache_age => 86400;
 
-while (my $q = new mySociety::CGIFast()) {
+while (my $q = new CGI::Fast()) {
     RABX::Server::CGI::dispatch(
             'Gaze.find_places' => [
                 sub { Gaze::find_places($_[0], $_[1], $_[2], $_[3], $_[4]); },
