@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.13 2008-02-02 19:45:54 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.14 2008-02-04 16:32:07 matthew Exp $';
 
 use strict;
 
@@ -23,27 +23,18 @@ BEGIN {
     mySociety::Config::set_file('../conf/general');
 }
 
-use FCGI;
+use mySociety::CGIFast;
 use RABX;
 
 use mySociety::WatchUpdate;
 
 use Gaze;
 
-my $req = FCGI::Request();
 my $W = new mySociety::WatchUpdate();
-
-# FastCGI signal handling
-my $exit_requested = 0;
-my $handling_request = 0;
-#$SIG{TERM} = $SIG{USR1} = sub {
-#    $exit_requested = 1;
-#    # exit(0) unless $handling_request;
-#};
 
 use constant cache_age => 86400;
 
-while ($handling_request = ($req->Accept() >= 0)) {
+while (my $q = new mySociety::CGIFast()) {
     RABX::Server::CGI::dispatch(
             'Gaze.find_places' => [
                 sub { Gaze::find_places($_[0], $_[1], $_[2], $_[3], $_[4]); },
@@ -79,6 +70,4 @@ while ($handling_request = ($req->Accept() >= 0)) {
             ]
         );
     $W->exit_if_changed();
-    $handling_request = 0;
-    last if $exit_requested;
 }

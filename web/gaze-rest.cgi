@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.25 2008-02-02 19:45:54 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.26 2008-02-04 16:32:07 matthew Exp $';
 
 use strict;
 
@@ -19,7 +19,7 @@ BEGIN {
     mySociety::Config::set_file('../conf/general');
 }
 
-use CGI::Fast;
+use mySociety::CGIFast;
 use Error qw(:try);
 use mySociety::WatchUpdate;
 use RABX; # only for RABX::Error
@@ -32,14 +32,6 @@ binmode(STDIN);
 binmode(STDOUT);
 
 my $W = new mySociety::WatchUpdate();
-
-# FastCGI signal handling
-my $exit_requested = 0;
-my $handling_request = 0;
-#$SIG{TERM} = $SIG{USR1} = sub {
-#    $exit_requested = 1;
-#    # exit(0) unless $handling_request;
-#};
 
 # XXX do this in Gaze.pm?
 my %countries = map { $_ => 1 } @{Gaze::get_find_places_countries()};
@@ -285,8 +277,7 @@ sub error ($%) {
             ), $text;
 }
     
-while (my $q = new CGI::Fast()) {
-    $handling_request = 1;
+while (my $q = new mySociety::CGIFast()) {
     my $f = $q->param('f');
     if (!defined($f)) {
         error($q, f => "missing (should specify function)");
@@ -407,6 +398,4 @@ while (my $q = new CGI::Fast()) {
         }
     }
     $W->exit_if_changed();
-    $handling_request = 0;
-    last if $exit_requested;
 }
