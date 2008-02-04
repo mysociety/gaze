@@ -11,7 +11,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.16 2008-02-04 17:49:30 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.17 2008-02-04 19:00:13 matthew Exp $';
 
 use strict;
 
@@ -30,8 +30,14 @@ use mySociety::WatchUpdate;
 
 use Gaze;
 
-my $req = FCGI::Request();
+my $req = FCGI::Request( \*STDIN, \*STDOUT, \*STDERR, \%ENV, 0, 1 );
 my $W = new mySociety::WatchUpdate();
+
+# Signal handling, so as to die after current request, not during
+my $exit_requested = 0;
+$SIG{TERM} = $SIG{USR1} = sub {
+    $exit_requested = 1;
+};
 
 use constant cache_age => 86400;
 
@@ -71,4 +77,5 @@ while ($req->Accept() >= 0) {
             ]
         );
     $W->exit_if_changed();
+    last if $exit_requested;
 }
