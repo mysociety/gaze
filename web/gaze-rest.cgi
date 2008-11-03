@@ -7,7 +7,7 @@
 # Email: chris@mysociety.org; WWW: http://www.mysociety.org/
 #
 
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.27 2008-02-04 17:44:43 matthew Exp $';
+my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.28 2008-11-03 09:58:49 matthew Exp $';
 
 use strict;
 
@@ -337,7 +337,7 @@ while (my $q = new CGI::Fast()) {
                 $ct = 'text/csv; charset=utf-8';
                 $r = qq("Name","In","Near","Latitude","Longitude","State","Score"\r\n);
                 foreach (@$l) {
-                    $r .= join(",", map { my $x = $_; $x ||= ''; $x =~ s/"/""/g; qq("$x") } @$_) . "\r\n";
+                    $r .= join(",", map { my $x = $_; $x = '' unless defined $x; $x =~ s/"/""/g; qq("$x") } @$_) . "\r\n";
                 }
             }
         } elsif ($f eq 'get_country_bounding_coords') {
@@ -384,7 +384,7 @@ while (my $q = new CGI::Fast()) {
                 $ct = 'text/csv; charset=utf-8';
                 $r = qq("Name","Country","State","Latitude","Longitude","Distance"\r\n);
                 foreach (@$l) {
-                    $r .= join(",", map { my $x = $_; $x ||= ''; $x =~ s/"/""/g; qq("$x") } @$_) . "\r\n";
+                    $r .= join(",", map { my $x = $_; $x  = '' unless defined $x; $x =~ s/"/""/g; qq("$x") } @$_) . "\r\n";
                 }
             }
         }
