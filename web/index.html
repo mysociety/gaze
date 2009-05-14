@@ -19,13 +19,13 @@ and another <a href="http://www.mysociety.org/?p=96">blog post about population 
 <h3>Usage instructions</h3>
 <p>
 When calling
-        <a href="http://gaze.mysociety.org/gaze-rest">http://gaze.mysociety.org/gaze-rest</a>
+        <a href="/gaze-rest">http://gaze.mysociety.org/gaze-rest</a>
 parameter f is always the function name, with the following parameters. 
 The content of the page returned is whitespace seperated, except where otherwise specified.
 </p>
 
 
-<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_country_from_ip;ip=130.88.200.10">get_country_from_ip</a></h4>
+<h4><a href="/gaze-rest?f=get_country_from_ip;ip=130.88.200.10">get_country_from_ip</a></h4>
 <ul>
 	<li>"ip" is the IP address to lookup</li>
 </ul>
@@ -35,7 +35,7 @@ The content of the page returned is whitespace seperated, except where otherwise
 </p>
 
 
-<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_coords_from_ip;ip=130.88.200.10">get_coords_from_ip</a></h4>
+<h4><a href="/gaze-rest?f=get_coords_from_ip;ip=130.88.200.10">get_coords_from_ip</a></h4>
 <ul>
 	<li> "ip" is the IP address to lookup</li>
 </ul>
@@ -44,13 +44,13 @@ The content of the page returned is whitespace seperated, except where otherwise
            given IP address, or undef if none could be found.
 </p>
 
-<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_find_places_countries">get_find_places_countries</a></h4>
+<h4><a href="/gaze-rest?f=get_find_places_countries">get_find_places_countries</a></h4>
 <p>This function takes no parameters and returns list of
    countries which find_places will work for (one item per line).
 </p>
 
 
-<h4><a href="http://gaze.mysociety.org/gaze-rest?f=find_places;country=US;query=Manchester">find_places</a></h4>
+<h4><a href="/gaze-rest?f=find_places;country=US;query=Manchester">find_places</a></h4>
 <ul>
         <li>"country" is the ISO country code to search for places</li>
         <li>"state" is the optional state within a country to search in.</li>
@@ -94,7 +94,7 @@ The content of the page returned is whitespace seperated, except where otherwise
            them.
 </p>
 
-<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_country_bounding_coords;country=GB">get_country_bounding_coords</a></h4>
+<h4><a href="/gaze-rest?f=get_country_bounding_coords;country=GB">get_country_bounding_coords</a></h4>
 <ul>
         <li>"country" is the ISO country code to return co-ordinates for</li>
 </ul>
@@ -107,7 +107,7 @@ The content of the page returned is whitespace seperated, except where otherwise
 </p>
 
 
-<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_population_density;lat=53.4780349399915;lon=-2.2443008422851562">get_population_density</a></h4>
+<h4><a href="/gaze-rest?f=get_population_density;lat=53.4780349399915;lon=-2.2443008422851562">get_population_density</a></h4>
 <ul>
   <li>"lat" is the latitude, north-positive in decimal degrees</li>
   <li>"lon" is the longtitude, east-positive in decimal degrees</li>
@@ -117,7 +117,7 @@ The content of the page returned is whitespace seperated, except where otherwise
            LON) in persons per square kilometer.
 </p>
  
-<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_radius_containing_population;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000">get_radius_containing_population</a></h4>
+<h4><a href="/gaze-rest?f=get_radius_containing_population;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000">get_radius_containing_population</a></h4>
 <ul>
   <li>"lat" is the latitude, north-positive in decimal degrees</li>
   <li>"lon" is the longtitude, east-positive in decimal degrees</li>
@@ -132,7 +132,7 @@ The content of the page returned is whitespace seperated, except where otherwise
           radius; if not specified, use 150km.
 </p>
 
-<h4><a href="http://gaze.mysociety.org/gaze-rest?f=get_places_near;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000;distance=100">get_places_near</a></h4>
+<h4><a href="/gaze-rest?f=get_places_near;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000;distance=100">get_places_near</a></h4>
 <ul>
   <li>"lat" is the latitude, north-positive in decimal degrees</li>
   <li>"lon" is the longtitude, east-positive in decimal degrees</li>
