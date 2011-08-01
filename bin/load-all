@@ -16,7 +16,7 @@
 # Specify two letter country code as parameter to just do that country.
 
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
-# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
+# Email: matthew@mysociety.org; WWW: http://www.mysociety.org/
 
 set -e
 #set -x # debug

@@ -3,9 +3,7 @@
 -- Schema for gazetteer service.
 --
 -- Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
--- Email: chris@mysociety.org; WWW: http://www.mysociety.org/
---
--- $Id: schema.sql,v 1.12 2006-12-01 15:35:21 matthew Exp $
+-- Email: matthew@mysociety.org; WWW: http://www.mysociety.org/
 --
 
 create table feature (

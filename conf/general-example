@@ -11,9 +11,7 @@
  * have multiple config files and use a symlink to change between them.
  * 
  * Copyright (c) 2004 UK Citizens Online Democracy. All rights reserved.
- * Email: francis@mysociety.org; WWW: http://www.mysociety.org
- *
- * $Id: general-example,v 1.1 2006-01-16 18:22:38 francis Exp $
+ * Email: matthew@mysociety.org; WWW: http://www.mysociety.org
  * 
  */
 

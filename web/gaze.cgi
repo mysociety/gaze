@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w -I../perllib -I../../../perllib
+#!/usr/bin/perl -w -I../perllib -I../commonlib/perllib
 #
 # gaze.cgi:
 # RABX server.
@@ -8,10 +8,7 @@
 #     SetHandler fastcgi-script
 #
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
-# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
-#
-
-my $rcsid = ''; $rcsid .= '$Id: gaze.cgi,v 1.17 2008-02-04 19:00:13 matthew Exp $';
+# Email: matthew@mysociety.org; WWW: http://www.mysociety.org/
 
 use strict;
 

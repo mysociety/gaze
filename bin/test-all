@@ -3,7 +3,7 @@
 # Tests Xapian database has been made for all countries
 
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
-# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
+# Email: matthew@mysociety.org; WWW: http://www.mysociety.org/
 
 BINPATH=`dirname $0`
 for FILE in split-??.txt

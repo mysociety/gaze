@@ -1,13 +1,10 @@
-#!/usr/bin/perl -w -I../perllib -I../../../perllib
+#!/usr/bin/perl -w -I../perllib -I../commonlib/perllib
 #
 # gaze-rest.cgi:
 # "RESTful" interface to Gaze.
 #
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
-# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
-#
-
-my $rcsid = ''; $rcsid .= '$Id: gaze-rest.cgi,v 1.28 2008-11-03 09:58:49 matthew Exp $';
+# Email: matthew@mysociety.org; WWW: http://www.mysociety.org/
 
 use strict;
 

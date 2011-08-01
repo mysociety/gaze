@@ -3,9 +3,7 @@
 # Common code for global gazetteer.
 #
 # Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
-# Email: chris@mysociety.org; WWW: http://www.mysociety.org/
-#
-# $Id: Gaze.pm,v 1.39 2007-10-19 19:20:28 matthew Exp $
+# Email: matthew@mysociety.org; WWW: http://www.mysociety.org/
 #
 
 package Gaze;
