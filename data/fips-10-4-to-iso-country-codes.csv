@@ -1,5 +1,6 @@
 "FIPS 10-4","ISO 3166",Name
 AF,AF,Afghanistan
+AX,-,Akrotiri
 AL,AL,Albania
 AG,DZ,Algeria
 AQ,AS,"American Samoa"
@@ -33,7 +34,6 @@ BC,BW,Botswana
 BV,BV,"Bouvet Island"
 BR,BR,Brazil
 IO,IO,"British Indian Ocean Territory"
-VI,VG,"British Virgin Islands"
 BX,BN,Brunei
 BU,BG,Bulgaria
 UV,BF,"Burkina Faso"
@@ -61,13 +61,14 @@ CS,CR,"Costa Rica"
 IV,CI,"Cote d'Ivoire"
 HR,HR,Croatia
 CU,CU,Cuba
+UC,CW,Curacao
 CY,CY,Cyprus
 EZ,CZ,"Czech Republic"
 DA,DK,Denmark
+DX,-,Dhekelia
 DJ,DJ,Djibouti
 DO,DM,Dominica
 DR,DO,"Dominican Republic"
-TT,TL,"East Timor"
 EC,EC,Ecuador
 EG,EG,Egypt
 ES,SV,"El Salvador"
@@ -75,8 +76,9 @@ EK,GQ,"Equatorial Guinea"
 ER,ER,Eritrea
 EN,EE,Estonia
 ET,ET,Ethiopia
+PJ,-,"Etorofu, Habomai, Kunashiri, and Shikotan Islands"
 EU,RE,"Europa Island"
-FA,FK,"Falkland Islands (Islas Malvinas)"
+FK,FK,"Falkland Islands (Islas Malvinas)"
 FO,FO,"Faroe Islands"
 FJ,FJ,Fiji
 FI,FI,Finland
@@ -105,7 +107,6 @@ PU,GW,Guinea-Bissau
 GY,GY,Guyana
 HA,HT,Haiti
 HM,HM,"Heard Island and McDonald Islands"
-VT,VA,"Holy See (Vatican City)"
 HO,HN,Honduras
 HK,HK,"Hong Kong"
 HQ,UM,"Howland Island"
@@ -116,6 +117,7 @@ ID,ID,Indonesia
 IR,IR,Iran
 IZ,IQ,Iraq
 EI,IE,Ireland
+IM,GB,Isle of Man
 IS,IL,Israel
 IT,IT,Italy
 JM,JM,Jamaica
@@ -132,6 +134,7 @@ KQ,UM,"Kingman Reef"
 KR,KI,Kiribati
 KN,KP,"Korea, North"
 KS,KR,"Korea, South"
+KV,-,Kosovo
 KU,KW,Kuwait
 KG,KG,Kyrgyzstan
 LA,LA,Laos
@@ -151,7 +154,6 @@ MY,MY,Malaysia
 MV,MV,Maldives
 ML,ML,Mali
 MT,MT,Malta
-IM,GB,"Man, Isle of"
 RM,MH,"Marshall Islands"
 MB,MQ,Martinique
 MR,MR,Mauritania
@@ -163,6 +165,7 @@ MQ,UM,"Midway Islands"
 MD,MD,Moldova
 MN,MC,Monaco
 MG,MN,Mongolia
+MJ,ME,Montenegro
 MH,MS,Montserrat
 MO,MA,Morocco
 MZ,MZ,Mozambique
@@ -172,7 +175,6 @@ NR,NR,Nauru
 BQ,UM,"Navassa Island"
 NP,NP,Nepal
 NL,NL,Netherlands
-NT,AN,"Netherlands Antilles"
 NC,NC,"New Caledonia"
 NZ,NZ,"New Zealand"
 NU,NI,Nicaragua
@@ -201,9 +203,11 @@ RE,RE,Reunion
 RO,RO,Romania
 RS,RU,Russia
 RW,RW,Rwanda
+TB,BL,Saint Barthelemy
 SH,SH,"Saint Helena"
 SC,KN,"Saint Kitts and Nevis"
 ST,LC,"Saint Lucia"
+RN,MF,Saint Martin
 SB,PM,"Saint Pierre and Miquelon"
 VC,VC,"Saint Vincent and the Grenadines"
 WS,WS,Samoa
@@ -211,16 +215,18 @@ SM,SM,"San Marino"
 TP,ST,"Sao Tome and Principe"
 SA,SA,"Saudi Arabia"
 SG,SN,Senegal
-YI,CS,"Serbia and Montenegro"
+RI,RS,Serbia
 SE,SC,Seychelles
 SL,SL,"Sierra Leone"
 SN,SG,Singapore
+NN,SX,Sint Maarten
 LO,SK,Slovakia
 SI,SI,Slovenia
 BP,SB,"Solomon Islands"
 SO,SO,Somalia
 SF,ZA,"South Africa"
 SX,GS,"South Georgia and the Islands"
+OD,SS,South Sudan
 SP,ES,Spain
 PG,-,"Spratly Islands"
 CE,LK,"Sri Lanka"
@@ -235,6 +241,7 @@ TW,TW,Taiwan
 TI,TJ,Tajikistan
 TZ,TZ,Tanzania
 TH,TH,Thailand
+TT,TL,Timor-Leste
 TO,TG,Togo
 TL,TK,Tokelau
 TN,TO,Tonga
@@ -254,9 +261,11 @@ US,US,"United States"
 UY,UY,Uruguay
 UZ,UZ,Uzbekistan
 NH,VU,Vanuatu
+VT,VA,Vatican City
 VE,VE,Venezuela
 VM,VN,Vietnam
-VQ,VI,"Virgin Islands"
+VI,VG,"Virgin Islands, British"
+VQ,VI,"Virgin Islands, U.S."
 -,-,"Virgin Islands (UK)"
 -,-,"Virgin Islands (US)"
 WQ,UM,"Wake Island"

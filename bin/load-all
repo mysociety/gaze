@@ -1,21 +1,10 @@
 #!/bin/bash
 
-# Loads all country data into gaze. 
-
-# To use:
-# 1) Make a new directory (must be empty), and download something like
-#    http://earth-info.nga.mil/gns/html/geonames_dd_dms_date_20050801.zip
-#    http://earth-info.nga.mil/gns/html/geonames_dd_dms_date_20070612.zip
-#    (get latest link from  "single compressed zip that contains the entire
-#    country files dataset" on http://earth-info.nga.mil/gns/html/cntry_files.html) 
-# 2) Unzip and extract the .txt file
-# 3) With the directory as current directory, run geonames-split with that file
-#    as input, to make split-XX.txt files 
-# 4) Again with same current directory, run this script.
+# Loads all non-US country data into gaze. To use, see the README.
 #
-# Specify two letter country code as parameter to just do that country.
+# Specify a two letter country code as parameter to just do that country.
 
-# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
+# Copyright (c) 2011 UK Citizens Online Democracy. All rights reserved.
 # Email: matthew@mysociety.org; WWW: http://www.mysociety.org/
 
 set -e

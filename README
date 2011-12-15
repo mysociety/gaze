@@ -1,0 +1,27 @@
+Gaze is a web service that can do the following:
+
+* Find the population density at a particular point (using GPW data)
+* Return the radius of a circle around a point containing a number of people
+* Find placenames around a point, limited to population or distance.
+* Perform a placename geocoding of a search query (using USGS and GEOnet Names data)
+* Return the ISO country code for an IP address
+
+It is used on e.g. FixMyStreet to work out how wide to search to show reports
+for a particular map, or on PledgeBank for local search.
+
+Installation
+============
+
+Set up a PostgreSQL database using the schema in db/schema.sql
+
+Fetch the single compressed zip that contains the entire country files dataset
+from http://earth-info.nga.mil/gns/html/cntry_files.html and unzip it in an
+empty directory.
+
+In that directory, run geonames-split with that file as input. Run load-all.
+This will import all the placename data for non-US countries. For the US,
+fetch the Populated Places dataset from http://geonames.usgs.gov/ and
+run usgs-geonames-parse.
+
+gpw-parse - convert Gridded Population of the World data into the format Gaze uses.
+

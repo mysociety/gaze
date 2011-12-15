@@ -67,20 +67,15 @@ while (my $line = <CC>) {
 }
 close(CC);
 
-# Defined in http://earth-info.nga.mil/gns/html/gis.html
+# Defined in http://earth-info.nga.mil/gns/html/gis_countryfiles.html
 my @fieldnames = qw(
-        RC UFI UNI LAT LONG DMS_LAT DMS_LONG UTM JOG FC DSG PC CC1 ADM1 ADM2
-        DIM CC2 NT LC SHORT_FORM GENERIC SORT_NAME FULL_NAME FULL_NAME_ND
-        MOD_DATE
+        RC UFI UNI LAT LONG DMS_LAT DMS_LONG MGRS JOG FC DSG PC CC1 ADM1 POP
+        ELEV CC2 NT LC SHORT_FORM GENERIC SORT_NAME_RO FULL_NAME_RO FULL_NAME_ND_RO
+        SORT_NAME_RG FULL_NAME_RG FULL_NAME_ND_RG NOTE MOD_DATE
     );
 
 # Use a pseudo-/restricted hash for these to save memory
-use fields qw(
-        RC UFI UNI LAT LONG DMS_LAT DMS_LONG UTM JOG FC DSG PC CC1 ADM1 ADM2
-        DIM CC2 NT LC SHORT_FORM GENERIC SORT_NAME FULL_NAME FULL_NAME_ND
-        MOD_DATE fips_CC1
-    );      # why can't we say use fields (@fieldnames, 'fips_CC1') ?
-
+use fields (@fieldnames, 'fips_CC1');
 
 sub process_one_country($$) {
     my ($country, $data) = @_;
@@ -118,23 +113,16 @@ sub process_one_country($$) {
         # Check that the various names are valid UTF-8. Experiments suggest that
         # SORT_NAME and FULL_NAME_ND won't be (though I'm not sure how they are
         # actually coded), but happily we don't need those.
-        foreach (qw(SHORT_FORM GENERIC FULL_NAME)) {
+        foreach (qw(SHORT_FORM GENERIC FULL_NAME_RO)) {
             if (!utf8::decode($fields{$_})) {
                 die "$_ name \"$fields{$_}\" for UFI $fields{UFI} UNI $fields{UNI} is not valid UTF-8";
             }
         }
 
-        my $name = $fields{FULL_NAME};
+        my $name = $fields{FULL_NAME_RO};
         next if ($name =~ m#\(\(.*\)\)#);
         die if ($name eq '');
 
-        # Change index reading order to normal reading order.
-        if ($name =~ /,/) {
-            print STDERR "$name -> ";
-            $name = join(' ', reverse(split(/,\s*/, $name)));
-            print STDERR "$name\n";
-        }
-        
         my $ufi = $fields{UFI};
         my $uni = $fields{UNI};
         $UFI_name{$ufi} ||= { };
