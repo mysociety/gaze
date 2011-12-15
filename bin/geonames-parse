@@ -5,8 +5,7 @@
 # This is for countries other than the US, for US see usgs-geonames-parse.
 #
 # Takes data on input pipe, no arguments. The input file must contain all data
-# for any countries within it. Any existing data for those countries are
-# removed from Gaze first.
+# for any countries within it. This should be run on a fresh database for import.
 #
 # Get country files here:
 #   http://earth-info.nga.mil/gns/html/cntry_files.html
@@ -333,10 +332,6 @@ print STDERR "Countries in input: " . join(' ', keys %countries) . "\n";
 my $countries_clause = join(' ', map {"'".$_."'"} keys %countries);
 
 foreach my $country (keys %countries) {
-    print STDERR "Deleting any existing data for $country... ";
-    dbh()->do("delete from name where name.ufi = feature.ufi and feature.country = ?", {}, $country);
-    dbh()->do("delete from feature where country = ?", {}, $country);
-    print STDERR "done\n";
     process_one_country($country, \%data);
     dbh()->commit();
 }
