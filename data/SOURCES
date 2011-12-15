@@ -1,5 +1,6 @@
 _fips_adm1_code_def_2.txt
-From NGA at <ftp://ftp.nga.mil/pub/gns_data/>, converted for UNIX newlines.
+From http://geonames.nga.mil/ggmagaz/ using ADM1 Codes Lookup Table and
+searching for all, copying results table to text file and sorting.
 
 fips-10-4-to-iso-country-codes.csv
 From <http://www.cia.gov/cia/publications/factbook/appendix/appendix-d.html>,
