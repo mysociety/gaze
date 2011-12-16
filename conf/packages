@@ -6,5 +6,5 @@ libjson-perl
 libxapian-dev
 libsearch-xapian-perl
 xapian-tools
-libtext-levenshtein-perl
+libtext-levenshtein-perl | libtext-levenshteinxs-perl
 libtext-csv-perl
