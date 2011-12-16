@@ -12,7 +12,7 @@
 #
 # For US see usgs-geonames-parse
 #
-# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
+# Copyright (c) 2011 UK Citizens Online Democracy. All rights reserved.
 # Email: matthew@mysociety.org; WWW: http://www.mysociety.org/
 
 use strict;
@@ -95,10 +95,18 @@ sub process_one_country($$) {
     # select the preferred "primary" name where names of several types are
     # available.
     my %name_type_preference = (
-            C => 0,         # Conventional
-            N => 1,         # Native
-            V => 2,         # Variant or alternate
-            D => 10         # Not verified
+            C  => 0,         # Conventional
+            NS => 1,         # Native
+            N  => 2,         # Native
+            VS => 3,         # Variant or alternate
+            V  => 4,         # Variant or alternate
+            VA => 5,         # Variant or alternate
+            DS => 6,         # Not verified
+            D  => 7,         # Not verified
+            HS => 8,         # Historic
+            H  => 9,         # Historic
+            PS => 10,        # Provisional
+            P  => 11,        # Provisional
         );
 
     # Hash which maps UFI to reference to hash of name to name-type and UNI.
@@ -279,9 +287,6 @@ sub trim ($) {
     return $x;
 }
 
-# Read in names
-<STDIN>;    # Skip header
-
 # Each record describes a name and a feature. Each feature may have multiple
 # names. 
 my $nf = 0;
@@ -307,7 +312,7 @@ while (my $line = <STDIN>) {
     if ($fields{NT} =~ m/^\s*$/) {
         warn "Name type blank, assuming 'C'. Line:\n$line";
         $fields{NT} = 'C';
-    } elsif ($fields{NT} !~ m/^[CDNV]$/) {
+    } elsif ($fields{NT} !~ m/^(C|[DNHP]S?|V[AS]?)$/) {
         die "Name type $fields{NT} not known. Line:\n$line";
     }
 

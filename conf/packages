@@ -5,3 +5,5 @@ libgeo-ip-perl
 libjson-perl
 libxapian-dev
 libsearch-xapian-perl
+libtext-levenshtein-perl
+libtext-csv-perl

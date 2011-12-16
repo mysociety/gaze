@@ -28,15 +28,15 @@ create table name (
     uni integer not null primary key,
     ufi integer not null references feature(ufi),
     is_primary boolean not null default false,
-    -- Name of the place, in UTF-8. But note that these are transcribed
-    -- into the Latin alphabet and so are no good to us in, e.g., China or
-    -- Russia.
+    -- Name of the place, in UTF-8.
     full_name text not null,
     -- C - Conventional
-    -- N - Native
-    -- V - Variant or alternate
-    -- D - Not verified
-    name_type char(1) check (name_type in ('C', 'D', 'N', 'V'))
+    -- N - Native (NS non-roman)
+    -- V - Variant or alternate (VA Anglicized, VS non-roman)
+    -- D - Not verified (DS non-roman)
+    -- H - Historic (HS non-roman)
+    -- P - Provisional (PS non-roman)
+    name_type char(2) check (name_type in ('C', 'D', 'DS', 'N', 'NS', 'V', 'VA', 'VS', 'H', 'HS', 'P', 'PS'))
 --    language_code char(2) -- references language(code) ?
 );
 

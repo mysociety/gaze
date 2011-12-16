@@ -24,7 +24,7 @@ do
     echo "compacting $X"
     rm -fr $X-compacted
     rm -fr $X-old
-    quartzcompact --fuller $X $X-compacted >/dev/null
+    xapian-compact --fuller $X $X-compacted >/dev/null
     BEFORE=`du -k $X | cut -f 1`
     AFTER=`du -k $X-compacted | cut -f 1`
     TOTAL_SAVED=$((TOTAL_SAVED + BEFORE - AFTER))

@@ -12,16 +12,32 @@ for a particular map, or on PledgeBank for local search.
 Installation
 ============
 
-Set up a PostgreSQL database using the schema in db/schema.sql
+$ git clone git://github.com/mysociety/gaze.git
+$ mkdir gaze-data
+$ cd gaze
+$ cp conf/general-example conf/general
+
+Edit the conf/general file to have the database connection parameters, and the
+location of two directories to store the Xapian and GPW data.
+
+Set up a PostgreSQL database called gaze.
 
 Fetch the single compressed zip that contains the entire country files dataset
-from http://earth-info.nga.mil/gns/html/cntry_files.html and unzip it in an
-empty directory.
+from http://earth-info.nga.mil/gns/html/cntry_files.html and unzip it in the
+gaze-data directory. For the US, fetch and unzip the Populated Places dataset
+from http://geonames.usgs.gov/ in the same place.
 
-In that directory, run geonames-split with that file as input. Run load-all.
-This will import all the placename data for non-US countries. For the US,
-fetch the Populated Places dataset from http://geonames.usgs.gov/ and
-run usgs-geonames-parse.
+Then run the following (replacing the input filenames with whatever you've just
+downloaded):
 
-gpw-parse - convert Gridded Population of the World data into the format Gaze uses.
+$ psql gaze gaze < db/schema.sql
+$ cd ../gaze-data
+$ ../gaze/bin/usgs-geonames-parse < P_PLACES_20111204.txt
+$ ../gaze/bin/xapian-index US
+$ ../gaze/bin/geonames-split < geonames_dd_dms_date_20111212.txt
+$ ../gaze/bin/load-all
+
+This will set up all the place name related stuff. TODO: Document gpw-parse
+beyond the comments in it - converting Gridded Population of the World data
+into the format Gaze uses.
 

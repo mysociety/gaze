@@ -3,11 +3,10 @@
 # usgs-geonames-parse:
 # Parse USGS geonames data.  For non-US countries see geonames-parse.
 #
-# Pass input data in on pipe, no argumens.  Get files from here:
-#   http://geonames.usgs.gov/stategaz/POP_PLACES_DECI.zip
-# (use the DECI one for decimal, rather than the degrees/mins/secs one)
+# Pass input data in on pipe, no arguments. Get Populated Places zip from here:
+#   http://geonames.usgs.gov/domestic/download_data.htm
 #
-# Copyright (c) 2005 UK Citizens Online Democracy. All rights reserved.
+# Copyright (c) 2011 UK Citizens Online Democracy. All rights reserved.
 # Email: matthew@mysociety.org; WWW: http://www.mysociety.org/
 
 use strict;
@@ -22,9 +21,7 @@ use Geo::Distance;
 use IO::File;
 use POSIX qw(acos);
 use Text::CSV;
-use Text::LevenshteinXS;    # Levenshtein edit distance -- use XS version
-                            # because of bugs in pure perl version:
-                            # http://rt.cpan.org/NoAuth/Bug.html?id=13873
+use Text::Levenshtein;
 
 use mySociety::Config;
 BEGIN {
@@ -79,10 +76,11 @@ while (defined(my $line = <STDIN>)) {
     #   source longitude (DMS) (12)
     #   source latitude (decimal) (13)
     #   source longitude (decimal) (14)
-    #   elevation
-    #   estimated population
-    #   Federal status
-    #   cell name   -- which map sheet it's on, I think
+    #   elevation in metres
+    #   elevation in feet
+    #   map name
+    #   date created
+    #   date edited
 
     # Only use 'populated places'
     next unless ($f[2] eq 'Populated Place');
@@ -207,7 +205,7 @@ foreach my $id (sort { $place{$a}->[0] cmp $place{$b}->[0] } keys(%ambiguous_id)
                         $_->[0] != $id
                         && !exists($deleted{$_->[0]})
                         && !exists($ambiguous_id{$_->[0]})
-                        && Text::LevenshteinXS::distance($name, $place{$_->[0]}->[0]) > (length($name) / 4.)
+                        && Text::Levenshtein::distance($name, $place{$_->[0]}->[0]) > (length($name) / 4.)
                     } find_places_near($lat, $lon, $maxdist);
 
     if (@disambig == 0) {
