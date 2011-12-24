@@ -87,6 +87,7 @@ my %dispatch = (
                             if (!utf8::decode($x));
                         return "too short"
                             unless (length($x) >= 2);
+                        utf8::decode($_[0]);
                         return undef;
                     }
                 ],
