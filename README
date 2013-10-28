@@ -23,7 +23,7 @@ location of two directories to store the Xapian and GPW data.
 Set up a PostgreSQL database called gaze.
 
 Fetch the single compressed zip that contains the entire country files dataset
-from http://earth-info.nga.mil/gns/html/cntry_files.html and unzip it in the
+from http://earth-info.nga.mil/gns/html/namefiles.htm and unzip it in the
 gaze-data directory. For the US, fetch and unzip the Populated Places dataset
 from http://geonames.usgs.gov/ in the same place.
 
