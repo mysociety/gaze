@@ -16,6 +16,7 @@ use mySociety::Config;
 use mySociety::DBHandle qw(dbh);
 use Geo::IP;
 use POSIX qw(acos);
+use Regexp::Common qw(net);
 use Search::Xapian qw(:ops);
 use File::Find;
 use RABX;
@@ -227,10 +228,16 @@ found.
 =cut
 sub get_country_from_ip ($) {
     my ($addr) = @_;
-    return undef if (!$addr || $addr =~ /^127\./);
-    our $geoip;
-    $geoip ||= new Geo::IP(GEOIP_STANDARD);
-    my $country = $geoip->country_code_by_addr($addr);
+    return undef if (!$addr || $addr =~ /^127\./ || $addr =~ /^(0:|::)*1$/);
+    our ($geoip, $geoip6);
+    my $country;
+    if ($addr =~ /^$RE{net}{IPv4}$/) {
+        $geoip ||= Geo::IP->open('/usr/share/GeoIP/GeoIP.dat', GEOIP_STANDARD);
+        $country = $geoip->country_code_by_addr($addr);
+    } else {
+        $geoip6 ||= Geo::IP->open('/usr/share/GeoIP/GeoIPv6.dat', GEOIP_STANDARD);
+        $country = $geoip6->country_code_by_addr_v6($addr);
+    }
     # GeoIP may also return "continent codes", in the case of addresses for
     # which a proper country code is not available. These are of almost no
     # value to us, so suppress them.

@@ -2,6 +2,8 @@ libcgi-fast-perl
 libio-string-perl
 libfcgi-perl
 libgeo-ip-perl
+libregexp-common-perl
+libregexp-ipv6-perl
 libjson-perl
 libxapian-dev
 libsearch-xapian-perl

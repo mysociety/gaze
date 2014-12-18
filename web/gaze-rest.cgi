@@ -21,6 +21,7 @@ use Error qw(:try);
 use mySociety::WatchUpdate;
 use RABX; # only for RABX::Error
 use Regexp::Common qw(net);
+use Regexp::IPv6 qw($IPv6_re);
 use utf8;
 
 use Gaze;
@@ -42,7 +43,7 @@ my %dispatch = (
                         return "missing"
                             if (!defined($_[0]));
                         return "invalid"
-                            unless ($_[0] =~ /^$RE{net}{IPv4}$/);
+                            unless ($_[0] =~ /^($RE{net}{IPv4}|$IPv6_re)$/);
                         return undef;
                     }
                 ]
