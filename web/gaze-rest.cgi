@@ -404,6 +404,7 @@ while (my $q = new CGI::Fast()) {
         if ($r) {
             utf8::encode($r);
             print $q->header(
+                        -access_control_allow_origin => '*',
                         -content_type => $ct,
                         -content_length => length($r),
                         -cache_control => "max-age=$cache"
