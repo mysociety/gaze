@@ -40,10 +40,11 @@ my %dispatch = (
                 ip => [
                     "IP address for which to return country, in dotted-quad notation",
                     sub ($) {
+                        my $ip = $_[0] || $ENV{REMOTE_ADDR};
                         return "missing"
-                            if (!defined($_[0]));
+                            unless defined($ip);
                         return "invalid"
-                            unless ($_[0] =~ /^($RE{net}{IPv4}|$IPv6_re)$/);
+                            unless $ip =~ /^($RE{net}{IPv4}|$IPv6_re)$/;
                         return undef;
                     }
                 ]
@@ -52,10 +53,11 @@ my %dispatch = (
                 ip => [
                     "IP address for which to return country, in dotted-quad notation",
                     sub ($) {
+                        my $ip = $_[0] || $ENV{REMOTE_ADDR};
                         return "missing"
-                            if (!defined($_[0]));
+                            unless defined($ip);
                         return "invalid"
-                            unless ($_[0] =~ /^$RE{net}{IPv4}$/);
+                            unless $ip =~ /^($RE{net}{IPv4}|$IPv6_re)$/;
                         return undef;
                     }
                 ]
@@ -306,14 +308,26 @@ while (my $q = new CGI::Fast()) {
 
         my $ct = 'text/plain; charset=utf-8';
         my $r;
+        my $cache = 86400;
         if (keys(%errors)) {
             error($q, %errors);
         } elsif ($f eq 'get_country_from_ip') {
-            $r = Gaze::get_country_from_ip($v{ip});
+            if ($v{ip}) {
+                $r = Gaze::get_country_from_ip($v{ip});
+            } else {
+                $r = Gaze::get_country_from_ip($ENV{REMOTE_ADDR});
+                $cache = 0;
+            }
             $r ||= '';
             $r .= "\n";
         } elsif ($f eq 'get_coords_from_ip') {
-            my ($lat, $lon) = Gaze::get_coords_from_ip($v{ip});
+            my ($lat, $lon);
+            if ($v{ip}) {
+                ($lat, $lon) = Gaze::get_coords_from_ip($v{ip});
+            } else {
+                ($lat, $lon) = Gaze::get_coords_from_ip($ENV{REMOTE_ADDR});
+                $cache = 0;
+            }
             $r = ($lat && $lon) ? "$lat,$lon" : '';
             $r .= "\n";
         } elsif ($f eq 'get_find_places_countries') {
@@ -392,7 +406,7 @@ while (my $q = new CGI::Fast()) {
             print $q->header(
                         -content_type => $ct,
                         -content_length => length($r),
-                        -cache_control => 'max-age=86400'
+                        -cache_control => "max-age=$cache"
                     ), $r;
         }
     }
