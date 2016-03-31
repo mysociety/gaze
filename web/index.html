@@ -1,22 +1,51 @@
-<html>
-<head><title>Gaze - the mySociety Gazetteer web service</title></head>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Gaze – the mySociety Gazetteer web service</title>
+    <link rel="stylesheet" href="/assets/css/global.css">
+    <meta name="viewport" content="initial-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,600,700,900,400italic' rel='stylesheet' type='text/css'>
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="ms-header">
+      <nav class="ms-header__row">
+         <a class="ms-header__logo" href="https://www.mysociety.org">mySociety</a>
+      </nav>
+    </div>
 
-<body>
-<h1>Gaze - the mySociety Gazetteer web service</h1>
+    <header class="site-header">
+      <div class="container">
+          <a href="/" class="site-title"><h1>Gaze – the mySociety Gazetteer web service</h1></a>
+      </div>
+    </header>
 
-<h3>Overview</h3>
+      <div class="page-wrapper">
+  <div class="page">
+
+      <ul class="breadcrumb">
+      </ul>
+
+      <div class="main-content-column">
+        <main role="main" class="main-content">
+
+<h2>Overview</h2>
 
 <p>There is general information about Gaze in the 
 <a href="http://www.mysociety.org/?p=83">blog post which announced its launch</a>,
 and another <a href="http://www.mysociety.org/?p=96">blog post about population density</a>.
 
-<h3>Language specific APIs</h3>
+<h2>Language specific APIs</h2>
 
 <p>Use the REST based API as described below.</p>
 
 <p>Perl users can use <a href="http://search.cpan.org/dist/WWW-MySociety-Gaze/">WWW::MySociety::Gaze</a>, which wraps the REST API.</p>
 
-<h3>Usage instructions</h3>
+<h2>Usage instructions</h2>
+
 <p>
 When calling
         <a href="/gaze-rest">http://gaze.mysociety.org/gaze-rest</a>
@@ -25,7 +54,7 @@ The content of the page returned is whitespace seperated, except where otherwise
 </p>
 
 
-<h4><a href="/gaze-rest?f=get_country_from_ip;ip=130.88.200.10">get_country_from_ip</a></h4>
+<h3><a href="/gaze-rest?f=get_country_from_ip;ip=130.88.200.10">get_country_from_ip</a></h3>
 <ul>
 	<li>"ip" is the IP address to lookup</li>
 </ul>
@@ -35,7 +64,7 @@ The content of the page returned is whitespace seperated, except where otherwise
 </p>
 
 
-<h4><a href="/gaze-rest?f=get_coords_from_ip;ip=130.88.200.10">get_coords_from_ip</a></h4>
+<h3><a href="/gaze-rest?f=get_coords_from_ip;ip=130.88.200.10">get_coords_from_ip</a></h3>
 <ul>
 	<li> "ip" is the IP address to lookup</li>
 </ul>
@@ -44,13 +73,13 @@ The content of the page returned is whitespace seperated, except where otherwise
            given IP address, or undef if none could be found.
 </p>
 
-<h4><a href="/gaze-rest?f=get_find_places_countries">get_find_places_countries</a></h4>
+<h3><a href="/gaze-rest?f=get_find_places_countries">get_find_places_countries</a></h3>
 <p>This function takes no parameters and returns list of
    countries which find_places will work for (one item per line).
 </p>
 
 
-<h4><a href="/gaze-rest?f=find_places;country=US;query=Manchester">find_places</a></h4>
+<h3><a href="/gaze-rest?f=find_places;country=US;query=Manchester">find_places</a></h3>
 <ul>
         <li>"country" is the ISO country code to search for places</li>
         <li>"state" is the optional state within a country to search in.</li>
@@ -94,7 +123,7 @@ The content of the page returned is whitespace seperated, except where otherwise
            them.
 </p>
 
-<h4><a href="/gaze-rest?f=get_country_bounding_coords;country=GB">get_country_bounding_coords</a></h4>
+<h3><a href="/gaze-rest?f=get_country_bounding_coords;country=GB">get_country_bounding_coords</a></h3>
 <ul>
         <li>"country" is the ISO country code to return co-ordinates for</li>
 </ul>
@@ -107,7 +136,7 @@ The content of the page returned is whitespace seperated, except where otherwise
 </p>
 
 
-<h4><a href="/gaze-rest?f=get_population_density;lat=53.4780349399915;lon=-2.2443008422851562">get_population_density</a></h4>
+<h3><a href="/gaze-rest?f=get_population_density;lat=53.4780349399915;lon=-2.2443008422851562">get_population_density</a></h3>
 <ul>
   <li>"lat" is the latitude, north-positive in decimal degrees</li>
   <li>"lon" is the longtitude, east-positive in decimal degrees</li>
@@ -117,7 +146,7 @@ The content of the page returned is whitespace seperated, except where otherwise
            LON) in persons per square kilometer.
 </p>
  
-<h4><a href="/gaze-rest?f=get_radius_containing_population;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000">get_radius_containing_population</a></h4>
+<h3><a href="/gaze-rest?f=get_radius_containing_population;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000">get_radius_containing_population</a></h3>
 <ul>
   <li>"lat" is the latitude, north-positive in decimal degrees</li>
   <li>"lon" is the longtitude, east-positive in decimal degrees</li>
@@ -132,7 +161,7 @@ The content of the page returned is whitespace seperated, except where otherwise
           radius; if not specified, use 150km.
 </p>
 
-<h4><a href="/gaze-rest?f=get_places_near;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000;distance=100">get_places_near</a></h4>
+<h3><a href="/gaze-rest?f=get_places_near;lat=53.4780349399915;lon=-2.2443008422851562;number=1000000;distance=100">get_places_near</a></h3>
 <ul>
   <li>"lat" is the latitude, north-positive in decimal degrees</li>
   <li>"lon" is the longtitude, east-positive in decimal degrees</li>
@@ -153,7 +182,56 @@ The content of the page returned is whitespace seperated, except where otherwise
            COUNTRY to bound results to one COUNTRY
 </p>
 
-<p><a href="http://www.mysociety.org"><img border="0" src="http://www.mysociety.org/mysociety_sm.gif"></a></p>
+        </main>
+      </div>
 
-</body>
+    <div class="secondary-content-column">
+      <nav class="sidebar">
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="https://github.com/mysociety/gaze">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+</div>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="column">
+          <h3>mySociety</h3>
+          <ul>
+            <li><a href="https://www.mysociety.org/helpus/">Get involved</a></li>
+            <li><a href="https://www.mysociety.org/about/">About us</a></li>
+            <li><a href="https://www.mysociety.org/about/team/">Our team</a></li>
+            <li><a href="https://www.mysociety.org/contact/">Contact us</a></li>
+            <li><a href="https://www.mysociety.org/donate/">Donate</a></li>
+          </ul>
+        </div>
+        <div class="column central">
+          <h3>Our Apps</h3>
+          <ul>
+            <li><a href="https://www.fixmystreet.com/">FixMyStreet</a></li>
+            <li><a href="https://www.writetothem.com/">WriteToThem</a></li>
+            <li><a href="https://www.whatdotheyknow.com/">WhatDoTheyKnow</a></li>
+            <li><a href="http://www.theyworkforyou.com/">TheyWorkForYou</a></li>
+            <li><a href="http://www.alaveteli.org/">Alaveteli</a></li>
+            <li><a href="http://www.pombola.org/">Pombola</a></li>
+            <li><a href="http://popit.mysociety.org/">PopIt</a></li>
+            <li><a href="http://sayit.mysociety.org/">SayIt</a></li>
+            <li><a href="http://mapit.mysociety.org/">MapIt</a></li>
+          </ul>
+        </div>
+        <div class="column">
+          <h3>Connect</h3>
+          <ul>
+            <li><a href="https://groups.google.com/a/mysociety.org/forum/#!forum/mysociety-community">Mailing list</a></li>
+            <li><a href="https://github.com/mysociety">GitHub</a></li>
+            <li><a href="http://www.irc.mysociety.org/">IRC</a></li>
+            <li><a href="https://twitter.com/mysociety">Twitter</a></li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+
+  </body>
 </html>
