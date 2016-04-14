@@ -145,6 +145,8 @@ my %dispatch = (
                         my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $lon += 0.; };
                         return "'$lon' is not a valid real number" if ($w);
+                        return "'$lon' is out-of-range (should be > -180, < 180)"
+                            if ($lon <= -180 || $lon >= 180);
                         return undef;
                     }
                 ]
@@ -170,6 +172,8 @@ my %dispatch = (
                         my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $lon += 0.; };
                         return "'$lon' is not a valid real number" if ($w);
+                        return "'$lon' is out-of-range (should be > -180, < 180)"
+                            if ($lon <= -180 || $lon >= 180);
                         return undef;
                     }
                 ], number => [
@@ -218,6 +222,8 @@ my %dispatch = (
                         my $w = undef;
                         eval { local $SIG{__WARN__} = sub { $w = shift; }; $lon += 0.; };
                         return "'$lon' is not a valid real number" if ($w);
+                        return "'$lon' is out-of-range (should be > -180, < 180)"
+                            if ($lon <= -180 || $lon >= 180);
                         return undef;
                     }
                 ], distance => [
