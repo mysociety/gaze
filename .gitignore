@@ -2,3 +2,4 @@ _Inline
 /conf/general
 /conf/general.deployed
 /web/down.html
+.sass-cache
