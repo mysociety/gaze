@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w -I../perllib -I../commonlib/perllib
+#!/usr/bin/perl -w -I../perllib -I../commonlib/perllib -I../local/lib/perl5
 #
 # gaze-rest.cgi:
 # "RESTful" interface to Gaze.
