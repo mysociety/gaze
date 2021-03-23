@@ -1,4 +1,6 @@
 // Compile this file like so:
 // $ sass --watch --style compressed web/assets/sass:web/assets/css
 
+$logo_path: "";
+
 @import '../../theme/sass/global';
