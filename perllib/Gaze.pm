@@ -230,7 +230,10 @@ sub get_country_from_ip ($) {
     return undef if (!$addr || $addr =~ /^127\./ || $addr =~ /^(0:|::)*1$/);
     our ($geoip);
     $geoip ||= GeoIP2::Database::Reader->new( file => '/var/lib/GeoIP/GeoLite2-Country.mmdb' );
-    my $country = $geoip->country(ip => $addr)->country->iso_code;
+    my $country = eval {
+        $geoip->country(ip => $addr)->country->iso_code;
+    };
+    warn $@ if $@; # Log but don't die
     return $country;
 }
 
